@@ -47,17 +47,30 @@ subtrees.
   the source's edge never falls short of the viewport edge — there's never
   a visible gap. The crop always resets to center the next time you enter
   Fill on that video; it isn't remembered across a Fill/Exit cycle.
+- Some Reddit video posts embed a third-party player (RedGIFs primarily,
+  also Imgur/Streamable) inside a cross-origin `<iframe>`, so the video
+  isn't reachable — or fillable in place — the same way as on the rest of
+  a page. A separate mechanism, scoped only to Reddit and those
+  embed-provider domains, still gets a Fill button next to that video;
+  clicking it fills the *iframe* itself to the full tab instead of the
+  video directly (the only way to reach the real viewport from inside a
+  cross-origin frame), coordinated behind the scenes so it never touches
+  the sites the main mechanism already handles.
 
 See [CHROME_EXTENSION_FILL_DRAG_REVISED.md](CHROME_EXTENSION_FILL_DRAG_REVISED.md)
 for the original design doc,
 [Specs/20260902101903-chrome-extension-fill-video/](Specs/20260902101903-chrome-extension-fill-video/)
-for the requirements/plan/validation behind the Fill-only slice, and
+for the requirements/plan/validation behind the Fill-only slice,
 [Specs/20260902121618-drag-to-reposition-fill-video/](Specs/20260902121618-drag-to-reposition-fill-video/)
-for horizontal drag-to-reposition.
+for horizontal drag-to-reposition, and
+[Specs/20260902124537-reddit-iframe-embed-fill/](Specs/20260902124537-reddit-iframe-embed-fill/)
+for the Reddit cross-origin embed iframe case.
 
-**Current scope:** Fill plus horizontal drag-to-reposition. Vertical
-dragging is not implemented yet — see the drag spec's Out of Scope
-section.
+**Current scope:** Fill plus horizontal drag-to-reposition, plus Reddit
+cross-origin embed iframe fill (RedGIFs primarily, best-effort for Imgur/
+Streamable). Vertical dragging is not implemented yet — see the drag
+spec's Out of Scope section. Drag-to-reposition is not available for
+Reddit-embedded videos — see the Reddit spec's Out of Scope section.
 
 ## Install (for testing, unpacked)
 

@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>reddit-embed fixture</title>
+</head>
+<body>
+  <!-- Stands in for a RedGIFs (or similar) embed iframe's own document: a
+       <video> plus only ancestorOverrides.js + reddit_fill.js — no
+       fillTab.js/drag.js/content.js, which never load inside a real
+       cross-origin embed iframe under this design. See
+       Specs/20260902124537-reddit-iframe-embed-fill/. -->
+  <video id="v1" width="200" height="200" muted></video>
+
+  <script src="../../extension/ancestorOverrides.js"></script>
+  <script src="../../extension/reddit_fill.js"></script>
+</body>
+</html>

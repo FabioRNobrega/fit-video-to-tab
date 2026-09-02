@@ -5,7 +5,18 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["fillTab.js", "drag.js", "content.js"],
+      "js": ["ancestorOverrides.js", "fillTab.js", "drag.js", "content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://*.reddit.com/*",
+        "*://*.redgifs.com/*",
+        "*://*.imgur.com/*",
+        "*://*.streamable.com/*"
+      ],
+      "js": ["ancestorOverrides.js", "reddit_fill.js"],
+      "all_frames": true,
       "run_at": "document_idle"
     }
   ]

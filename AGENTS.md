@@ -26,25 +26,34 @@ isolated test suite under `tests/`, not to the extension itself.
 ## Repository Map
 
 - `extension/` — the shipped Manifest V3 extension: `manifest.json`,
-  `content.js` (video discovery, the shadow-DOM overlay, button-row
-  lifecycle), `fillTab.js` (fill-mode state machine, ancestor
-  neutralization, Play/Pause + Mute wiring), `drag.js` (horizontal
-  drag-to-reposition for the currently-filled video, wired into
-  `fillTab.js`'s enter/exit lifecycle).
+  `ancestorOverrides.js` (shared ancestor clipping/stacking-override walk
+  and the cross-module fill-exclusivity arbiter), `content.js` (video
+  discovery, the shadow-DOM overlay, button-row lifecycle), `fillTab.js`
+  (fill-mode state machine, Play/Pause + Mute wiring), `drag.js`
+  (horizontal drag-to-reposition for the currently-filled video, wired
+  into `fillTab.js`'s enter/exit lifecycle), `reddit_fill.js` (Reddit
+  cross-origin embed-iframe fill — RedGIFs primarily, also Imgur/
+  Streamable — a separate mechanism loaded only on those domains; see
+  Architecture Summary).
 - `tests/` — a self-contained Playwright regression suite (Dockerized —
   see Execution Environment). `tests/fixtures/*.html` reproduce the actual
   DOM shapes behind real bugs found on x.com and Reddit (plus one, `drag.html`,
   that stubs known intrinsic video dimensions for deterministic drag-math
-  assertions); `tests/e2e/*.spec.js` are the corresponding tests;
+  assertions; and `reddit-top.html`/`reddit-embed.html`/
+  `reddit-top-untrusted-embed.html`, the cross-origin-iframe fixture pair
+  for the Reddit embed mechanism — see `tests/e2e/helpers/serveRepoAtOrigin.js`
+  for how they're served from a genuinely distinct origin);
+  `tests/e2e/*.spec.js` are the corresponding tests;
   `tests/package.json`/`playwright.config.js` are scoped to `tests/` only,
   not the repo root.
 - `Specs/` — SDD-style spec folders (`<14-digit-timestamp>-<slug>/`), each
-  with `Requirements.md`, `Plan.md`, `Validation.md`. Two specs so far:
-  `20260902101903-chrome-extension-fill-video/` (the Fill-only slice) and
+  with `Requirements.md`, `Plan.md`, `Validation.md`. Three specs so far:
+  `20260902101903-chrome-extension-fill-video/` (the Fill-only slice),
   `20260902121618-drag-to-reposition-fill-video/` (horizontal
-  drag-to-reposition, the deferred follow-up the first spec anticipated;
-  vertical dragging remains a further follow-up — see that spec's Out of
-  Scope).
+  drag-to-reposition; vertical dragging remains a further follow-up — see
+  that spec's Out of Scope), and
+  `20260902124537-reddit-iframe-embed-fill/` (Reddit cross-origin embed
+  iframe fill — RedGIFs primarily, also Imgur/Streamable).
 - `README.md` — user-facing: what the extension does, how it works, how
   to install it unpacked, how to run the tests.
 - `Makefile` — orchestrates the test suite via Docker (`test`,
@@ -52,12 +61,26 @@ isolated test suite under `tests/`, not to the extension itself.
 
 ## Architecture Summary
 
-Three plain, unbundled IIFE scripts, loaded by the manifest in this order —
-`fillTab.js`, then `drag.js`, then `content.js` — and communicating
-through one shared namespace object, `window.__fdExt` (chosen over bare
-globals specifically to avoid colliding with the host page's own global
-scope):
+`extension/manifest.json` declares two `content_scripts` entries. The
+first matches `<all_urls>` (default `all_frames: false`, so it only ever
+runs in a tab's top-level document) and loads four plain, unbundled IIFE
+scripts in this order — `ancestorOverrides.js`, `fillTab.js`, `drag.js`,
+then `content.js` — communicating through one shared namespace object,
+`window.__fdExt` (chosen over bare globals specifically to avoid
+colliding with the host page's own global scope). The second entry
+matches only `reddit.com` plus known embed-provider domains
+(`redgifs.com`, `imgur.com`, `streamable.com`), sets `all_frames: true`,
+and loads `ancestorOverrides.js` + `reddit_fill.js` — see "Reddit
+cross-origin embed fill" below for why this is a second, independent
+entry rather than an extension of the first.
 
+- **`ancestorOverrides.js`** holds the ancestor clipping/stacking-override
+  walk (`FD.neutralizeAncestors(startElement)` /
+  `FD.restoreAncestors(overridden)`) shared by `fillTab.js` (walking from
+  a `<video>`'s parent) and `reddit_fill.js` (walking from an `<iframe>`
+  element's parent), plus a small cross-module exclusivity arbiter,
+  `FD.requestExclusiveFill(exitOthers)` — see "Cross-mechanism
+  exclusivity" below.
 - **`content.js`** is the orchestrator: it appends one sibling `<div>`
   (`overlayHost`, with an open Shadow DOM) directly to `<body>`, then
   recursively discovers every `<video>` on the page — including inside
@@ -77,19 +100,22 @@ scope):
   native Fullscreen API, which was tried and rejected because it hides the
   browser's own tab/address-bar chrome. To reach the true viewport past a
   page's own clipping/transform ancestors, and to paint above the page's
-  own fixed UI (e.g. a site's fixed sidebar), it walks the video's
-  ancestor chain computing two independent override sets —
-  `computeClippingOverrides` (overflow/transform/filter/perspective/
-  contain/clip-path/will-change) and `computeStackingOverrides`
-  (position:fixed/sticky, z-index, opacity, mix-blend-mode, isolation) —
-  saving/restoring each touched ancestor's exact `style.cssText`. Only the
-  clipping set is bounded by a shared-ancestor stop (`isSharedAncestor`:
-  any ancestor containing more than one `<video>`); the stacking set is
-  not, since it only changes paint order and can never reveal a sibling
-  video's content. This split exists because a single stop point for both
-  sets could not satisfy both constraints on real pages (x.com) — see
+  own fixed UI (e.g. a site's fixed sidebar), `enterFill` calls
+  `ancestorOverrides.js`'s `FD.neutralizeAncestors(video)`, which computes
+  two independent override sets while walking the ancestor chain —
+  clipping (overflow/transform/filter/perspective/contain/clip-path/
+  will-change) and stacking (position:fixed/sticky, z-index, opacity,
+  mix-blend-mode, isolation) — saving/restoring each touched ancestor's
+  exact `style.cssText`. Only the clipping set is bounded by a
+  shared-ancestor stop (any ancestor containing more than one `<video>`);
+  the stacking set is not, since it only changes paint order and can never
+  reveal a sibling video's content. This split exists because a single
+  stop point for both sets could not satisfy both constraints on real
+  pages (x.com) — see
   `Specs/20260902101903-chrome-extension-fill-video/Requirements.md`'s
   Problem Statement, fifth finding, for the incident that drove this.
+  `enterFill` also calls `FD.requestExclusiveFill(exitFill)` so a Reddit
+  cross-origin embed fill (below) can't be active at the same time.
 - **`drag.js`** owns horizontal drag-to-reposition for whichever single
   video is currently filled (module-level `session`/`activeVideo`, same
   single-video-at-a-time shape as `fillTab.js`'s own state). Exposes
@@ -124,6 +150,63 @@ before cleanup) reverses all of the above — including `FD.detachDrag(video)`
 and clearing `object-position` back to center — and restores every
 neutralized ancestor exactly.
 
+### Reddit cross-origin embed fill
+
+Many Reddit video posts embed a third-party player (RedGIFs primarily,
+also Imgur/Streamable) inside a cross-origin `<iframe>`, so the `<video>`
+lives in a document the `<all_urls>` entry never sees (`all_frames`
+defaults to `false`), and even with visibility, `position: fixed` inside
+a cross-origin iframe only reaches that iframe's own rendered box, not
+the tab's real viewport. `reddit_fill.js` is a single IIFE loaded into
+every frame matched by its own `content_scripts` entry, branching once on
+`window.top === window.self` into one of two roles that never both run in
+the same frame:
+
+- **Embed-iframe role** (`redgifs.com`/`imgur.com`/`streamable.com`):
+  discovers `<video>` elements in its own document (same Shadow-DOM-aware
+  traversal shape as `content.js`'s `observeRoot`) and attaches its own
+  button row, scoped to its own document (its own shadow-DOM sibling
+  appended to its own `<body>` — never touches the top frame's DOM). Fill/
+  Exit clicks don't touch the video's styles; they `postMessage` the top
+  frame (`{ type: "fd-reddit-fill", action: "enter" | "exit" }`) and
+  optimistically flip the row's own label. Play/Pause and Mute act on the
+  local `<video>` directly. `Escape` inside this frame also sends `exit`.
+- **Top-frame role** (`reddit.com`): listens for `message` events,
+  validates `event.origin` against the embed-provider allowlist before
+  acting, resolves which `<iframe>` element sent it by recursively
+  searching `document.body` *and every open shadow root* for one whose
+  `contentWindow === event.source` (real Reddit nests the embed iframe
+  inside its own player-wrapper custom element's shadow root — a plain
+  `document.querySelectorAll("iframe")` never finds it there; found via
+  manual testing against a real post, not anticipated in the original
+  Plan). On a match, applies the fill sizing (fixed/inset/100vw/100vh,
+  `border: 0`, high `z-index`) as an **inline style** on the `<iframe>`
+  element itself (saving/restoring its prior `style.cssText`) — not a
+  class backed by a `document.head` stylesheet, because an open Shadow
+  DOM is its own style scope and a stylesheet rule in the outer document
+  never reaches an element nested inside one; a `fd-reddit-frame-fill`
+  class is still added/removed alongside it purely as a test/styling
+  hook, not as what actually produces the visual fill. Also calls
+  `FD.neutralizeAncestors(iframeEl)`/`FD.restoreAncestors(...)` from
+  `ancestorOverrides.js`, whose ancestor walk itself now crosses back out
+  of a shadow root via `shadowRoot.host` (plain `.parentElement` stops at
+  a shadow boundary) so it can keep escaping the page's *light-DOM*
+  ancestors above the shadow host, not just the ones inside it. Also
+  listens for `Escape` independently (so it works regardless of which
+  frame has focus) and notifies the embed iframe via `postMessage` on any
+  exit path so that frame's button row resets too.
+
+**Cross-mechanism exclusivity**: both `fillTab.js`'s `enterFill` and
+`reddit_fill.js`'s top-frame `enter` handler call
+`FD.requestExclusiveFill(<their own exit function>)` before applying
+their own fill. The arbiter (in `ancestorOverrides.js`) evicts whichever
+exit function was previously registered if it differs from the new one,
+so only one video — via either mechanism — is ever filled at a time
+tab-wide. Both exit functions are idempotent (safe to call when nothing
+of theirs is active), which is what makes this safe to call
+unconditionally. See
+`Specs/20260902124537-reddit-iframe-embed-fill/`.
+
 ## Execution Environment
 
 The extension itself needs no build step — load `extension/` unpacked via
@@ -148,19 +231,27 @@ install layer, then runs `npx playwright test` from `tests/`.
 
 - No `chrome.*` API usage anywhere in the extension — this is intentional
   (§1 of the design doc: "no background worker needed") and is also what
-  makes the test suite possible: all three scripts run identically whether
+  makes the test suite possible: all scripts run identically whether
   loaded as an extension or as plain `<script>` tags on a fixture page.
-- All three files are IIFEs attaching only to `window.__fdExt`; never add a
+- Every file is an IIFE attaching only to `window.__fdExt`; never add a
   bare global.
-- `fillTab.js`, then `drag.js`, then `content.js` in `manifest.json`'s `js`
-  array is load order, not incidental — `fillTab.js` calls `FD.attachDrag`/
-  `FD.detachDrag` as soon as fill mode toggles, and `content.js` calls into
-  `window.__fdExt` as soon as it runs.
+- `ancestorOverrides.js` before `fillTab.js`, then `drag.js`, then
+  `content.js` in the `<all_urls>` entry's `js` array is load order, not
+  incidental — `fillTab.js` calls `FD.neutralizeAncestors`/
+  `FD.requestExclusiveFill` from `ancestorOverrides.js` and `FD.attachDrag`/
+  `FD.detachDrag` from `drag.js` as soon as fill mode toggles, and
+  `content.js` calls into `window.__fdExt` as soon as it runs. Likewise
+  `ancestorOverrides.js` before `reddit_fill.js` in the Reddit-scoped
+  entry. Any new test fixture that loads `fillTab.js` must also load
+  `ancestorOverrides.js` first, or `enterFill` throws (`FD.neutralizeAncestors`
+  is undefined) the moment Fill is clicked.
 - The extension must never insert, move, wrap, or remove any existing
   host-page DOM node. It may only: set attributes/classes/inline styles on
-  the `<video>` it targets, temporarily override specific inline-style
-  properties on the video's *existing* ancestors (always saved/restored
-  exactly), and append its own single sibling `overlayHost` to `<body>`.
+  the `<video>` (or, for the Reddit embed-iframe mechanism, the `<iframe>`)
+  it targets, temporarily override specific inline-style properties on
+  that element's *existing* ancestors (always saved/restored exactly), and
+  append its own single sibling `overlayHost` to `<body>` — in whichever
+  document it's running in, never a different document.
 - Interactive elements the extension adds get a `data-fd-role` attribute
   (`fill`, `play-pause`, `mute`) rather than relying on button text or DOM
   order for identification — this is what the test suite targets.
@@ -180,10 +271,16 @@ install layer, then runs `npx playwright test` from `tests/`.
   deliberately tried and rejected (see Requirements.md's Problem
   Statement) because it hides browser chrome, which is not the intended
   behavior.
-- Any change to the ancestor-neutralization logic in `fillTab.js` should
-  come with an update to `tests/e2e/clipping-stacking.spec.js` — this
-  exact code has already regressed once from an under-tested change (see
-  Architecture Summary).
+- Any change to the ancestor-neutralization logic in `ancestorOverrides.js`
+  should come with an update to `tests/e2e/clipping-stacking.spec.js` (the
+  generic path) and `tests/e2e/reddit-iframe-fill.spec.js` (the Reddit
+  iframe path, which shares this code) — this exact logic has already
+  regressed once from an under-tested change (see Architecture Summary).
+- `reddit_fill.js`'s embed-provider allowlist (`EMBED_ORIGIN_RE`) must
+  stay in sync with `manifest.json`'s second `content_scripts` entry's
+  `matches` list — a domain added to one without the other either can
+  never send a trusted `postMessage` (regex omitted) or loads a script
+  that can never actually run there (manifest match omitted).
 
 ## Available Commands
 
@@ -217,3 +314,6 @@ files to match, don't just fix the code.
 - [Specs/20260902121618-drag-to-reposition-fill-video/](Specs/20260902121618-drag-to-reposition-fill-video/)
   — the horizontal drag-to-reposition spec: `Requirements.md`, `Plan.md`,
   `Validation.md`.
+- [Specs/20260902124537-reddit-iframe-embed-fill/](Specs/20260902124537-reddit-iframe-embed-fill/)
+  — the Reddit cross-origin embed iframe fill spec: `Requirements.md`,
+  `Plan.md`, `Validation.md`.

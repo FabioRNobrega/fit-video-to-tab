@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>reddit-top fixture</title>
+</head>
+<body>
+  <!-- Reproduces a Reddit post page's shape: a same-document video handled
+       by the generic path (fillTab.js/content.js), plus a cross-origin
+       embed iframe (standing in for RedGIFs) handled by reddit_fill.js's
+       top-frame role. The iframe sits inside a clipping/stacking-context
+       wrapper, mirroring clipping-stacking.html's #wrapper, to exercise
+       ancestor neutralization on the <iframe> element itself. See
+       Specs/20260902124537-reddit-iframe-embed-fill/. -->
+  <video id="native" width="200" height="200" muted></video>
+
+  <div id="wrapper" style="overflow: hidden; width: 300px; height: 300px; position: relative;">
+    <iframe
+      id="embed"
+      src="https://www.redgifs.com/tests/fixtures/reddit-embed.html"
+      width="400"
+      height="300"
+    ></iframe>
+  </div>
+
+  <script src="../../extension/ancestorOverrides.js"></script>
+  <script src="../../extension/fillTab.js"></script>
+  <script src="../../extension/drag.js"></script>
+  <script src="../../extension/content.js"></script>
+  <script src="../../extension/reddit_fill.js"></script>
+</body>
+</html>

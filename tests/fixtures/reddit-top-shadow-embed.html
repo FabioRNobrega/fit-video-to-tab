@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>reddit-top shadow-embed fixture</title>
+</head>
+<body>
+  <!-- Reproduces the real regression found testing against Reddit: the
+       RedGIFs <iframe> is not a direct child of <body> but nested inside
+       a custom element's OPEN Shadow DOM (Reddit's own player-wrapper
+       component), itself inside a clipping/stacking-context wrapper
+       further up the light DOM. Without shadow-DOM-aware iframe discovery
+       AND an ancestor walk that crosses back out of the shadow root,
+       reddit_fill.js's top-frame role could neither find the iframe to
+       fill it, nor escape the page's own layout ancestors once found —
+       "Fill" would flip the button to "Exit" but visibly do nothing. See
+       Specs/20260902124537-reddit-iframe-embed-fill/. -->
+  <div id="wrapper" style="overflow: hidden; width: 300px; height: 300px; position: relative;">
+    <fake-player-wrapper></fake-player-wrapper>
+  </div>
+
+  <script>
+    customElements.define(
+      "fake-player-wrapper",
+      class extends HTMLElement {
+        connectedCallback() {
+          const shadow = this.attachShadow({ mode: "open" });
+          const iframe = document.createElement("iframe");
+          iframe.id = "embed";
+          iframe.src = "https://www.redgifs.com/tests/fixtures/reddit-embed.html";
+          iframe.width = "400";
+          iframe.height = "300";
+          shadow.appendChild(iframe);
+        }
+      }
+    );
+  </script>
+
+  <script src="../../extension/ancestorOverrides.js"></script>
+  <script src="../../extension/fillTab.js"></script>
+  <script src="../../extension/drag.js"></script>
+  <script src="../../extension/content.js"></script>
+  <script src="../../extension/reddit_fill.js"></script>
+</body>
+</html>
