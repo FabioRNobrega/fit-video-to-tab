@@ -1,0 +1,12 @@
+{
+  "name": "fill-video-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Playwright regression tests for the Fill Video content script, run inside Docker only.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.47.0"
+  }
+}

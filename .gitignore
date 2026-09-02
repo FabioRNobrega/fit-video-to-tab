@@ -1,0 +1,32 @@
+# Dependencies (installed only inside the Playwright test container —
+# see tests/Dockerfile — never expected on the host, but ignore just in case)
+node_modules/
+
+# Playwright test artifacts
+tests/test-results/
+tests/playwright-report/
+tests/blob-report/
+tests/playwright/.cache/
+
+# Environment / secrets — this project has none today, but never commit one
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Packed extension artifacts (built locally, not source)
+*.zip
+*.crx
+*.pem

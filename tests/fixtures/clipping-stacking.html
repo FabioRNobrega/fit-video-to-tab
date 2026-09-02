@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>clipping-stacking fixture</title>
+  <style>
+    /* Reproduces the x.com shape that drove the ancestor-neutralization
+       fixes: a per-video clipping wrapper (overflow:hidden), inside a
+       shared timeline that holds MULTIPLE videos, inside an app-level
+       wrapper that establishes its own stacking context shared with a
+       fixed sidebar. */
+    html, body { margin: 0; padding: 0; }
+    #app { position: relative; z-index: 1; }
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 60px;
+      height: 100%;
+      background: red;
+      z-index: 5;
+    }
+    #timeline {
+      overflow: hidden;
+      width: 400px;
+      height: 600px;
+      margin-left: 60px;
+    }
+    .tweet { margin-bottom: 16px; }
+    .clip {
+      overflow: hidden;
+      width: 200px;
+      height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="sidebar"></div>
+    <div id="timeline">
+      <div class="tweet">
+        <div class="clip">
+          <video id="v1" width="200" height="200"></video>
+        </div>
+      </div>
+      <div class="tweet">
+        <div class="clip">
+          <video id="v2" width="200" height="200"></video>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../extension/fillTab.js"></script>
+  <script src="../../extension/content.js"></script>
+</body>
+</html>

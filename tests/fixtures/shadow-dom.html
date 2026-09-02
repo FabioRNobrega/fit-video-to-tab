@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>shadow-dom fixture</title>
+</head>
+<body>
+  <!-- Reproduces the Reddit/redgifs shape: a <video> rendered inside an
+       open Shadow DOM, invisible to plain querySelectorAll/MutationObserver
+       scoped to document.body. -->
+  <fake-player></fake-player>
+
+  <script>
+    customElements.define(
+      "fake-player",
+      class extends HTMLElement {
+        connectedCallback() {
+          const shadow = this.attachShadow({ mode: "open" });
+          const video = document.createElement("video");
+          video.id = "v1";
+          video.width = 200;
+          video.height = 200;
+          shadow.appendChild(video);
+        }
+      }
+    );
+  </script>
+
+  <script src="../../extension/fillTab.js"></script>
+  <script src="../../extension/content.js"></script>
+</body>
+</html>
