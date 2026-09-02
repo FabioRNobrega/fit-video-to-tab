@@ -28,23 +28,23 @@ isolated test suite under `tests/`, not to the extension itself.
 - `extension/` — the shipped Manifest V3 extension: `manifest.json`,
   `content.js` (video discovery, the shadow-DOM overlay, button-row
   lifecycle), `fillTab.js` (fill-mode state machine, ancestor
-  neutralization, Play/Pause + Mute wiring).
+  neutralization, Play/Pause + Mute wiring), `drag.js` (horizontal
+  drag-to-reposition for the currently-filled video, wired into
+  `fillTab.js`'s enter/exit lifecycle).
 - `tests/` — a self-contained Playwright regression suite (Dockerized —
   see Execution Environment). `tests/fixtures/*.html` reproduce the actual
-  DOM shapes behind real bugs found on x.com and Reddit; `tests/e2e/*.spec.js`
-  are the corresponding tests; `tests/package.json`/`playwright.config.js`
-  are scoped to `tests/` only, not the repo root.
+  DOM shapes behind real bugs found on x.com and Reddit (plus one, `drag.html`,
+  that stubs known intrinsic video dimensions for deterministic drag-math
+  assertions); `tests/e2e/*.spec.js` are the corresponding tests;
+  `tests/package.json`/`playwright.config.js` are scoped to `tests/` only,
+  not the repo root.
 - `Specs/` — SDD-style spec folders (`<14-digit-timestamp>-<slug>/`), each
-  with `Requirements.md`, `Plan.md`, `Validation.md`. Currently one spec:
-  `20260902101903-chrome-extension-fill-video/`, covering the Fill-only
-  slice (drag-to-reposition is a deliberately separate, not-yet-written
-  follow-up spec).
-- `CHROME_EXTENSION_FILL_DRAG_REVISED.md` — the original hand-written
-  design doc this project's first spec was based on. Several of its
-  original mechanisms (the CSS-only fill approach, the ancestor-traversal
-  option) were revisited after real-site testing — see the spec's
-  Requirements.md Problem Statement for the full history of what changed
-  and why before treating this doc as current behavior.
+  with `Requirements.md`, `Plan.md`, `Validation.md`. Two specs so far:
+  `20260902101903-chrome-extension-fill-video/` (the Fill-only slice) and
+  `20260902121618-drag-to-reposition-fill-video/` (horizontal
+  drag-to-reposition, the deferred follow-up the first spec anticipated;
+  vertical dragging remains a further follow-up — see that spec's Out of
+  Scope).
 - `README.md` — user-facing: what the extension does, how it works, how
   to install it unpacked, how to run the tests.
 - `Makefile` — orchestrates the test suite via Docker (`test`,
@@ -52,10 +52,11 @@ isolated test suite under `tests/`, not to the extension itself.
 
 ## Architecture Summary
 
-Two plain, unbundled IIFE scripts, loaded by the manifest in this order —
-`fillTab.js` then `content.js` — and communicating through one shared
-namespace object, `window.__fdExt` (chosen over bare globals specifically
-to avoid colliding with the host page's own global scope):
+Three plain, unbundled IIFE scripts, loaded by the manifest in this order —
+`fillTab.js`, then `drag.js`, then `content.js` — and communicating
+through one shared namespace object, `window.__fdExt` (chosen over bare
+globals specifically to avoid colliding with the host page's own global
+scope):
 
 - **`content.js`** is the orchestrator: it appends one sibling `<div>`
   (`overlayHost`, with an open Shadow DOM) directly to `<body>`, then
@@ -89,21 +90,39 @@ to avoid colliding with the host page's own global scope):
   sets could not satisfy both constraints on real pages (x.com) — see
   `Specs/20260902101903-chrome-extension-fill-video/Requirements.md`'s
   Problem Statement, fifth finding, for the incident that drove this.
+- **`drag.js`** owns horizontal drag-to-reposition for whichever single
+  video is currently filled (module-level `session`/`activeVideo`, same
+  single-video-at-a-time shape as `fillTab.js`'s own state). Exposes
+  `attachDrag(video)`/`detachDrag(video)`, called by `fillTab.js`'s
+  `enterFill`/`exitFill` — never runs on a video that isn't filled.
+  `pointerdown` captures the pointer and records a drag session (start
+  `clientX`, start `object-position` X, the video's rendered viewport rect,
+  and its intrinsic `videoWidth`/`videoHeight`); `pointermove`, once past a
+  6px threshold, recomputes the crop position using the same
+  cover-scale/overflow math as
+  `home/deck/Documents/Projects/video-manager`'s `VideoFrameState.ApplyDrag`
+  (`scale = max(viewportW/videoW, viewportH/videoH)`, `overflowX = max(0,
+  videoW*scale - viewportW)`, clamped `[0, 100]`), restricted to the X axis
+  only — Y always stays `50%`. Ported conceptually (not literally) from
+  that Blazor/WebAssembly reference project — see
+  `Specs/20260902121618-drag-to-reposition-fill-video/`.
 
 ### Fill lifecycle
 
 `content.js`'s Fill button calls `fillTab.js`'s `toggleFill(video,
 controls)`, where `controls` is `{ fillBtn, playPauseBtn, muteBtn }`.
 Entering fill mode: adds the class, snapshots/removes native `controls`,
-runs the ancestor walk, shows Play/Pause + Mute, adds an `Escape` keydown
-listener (added on entry, removed on exit through *either* path — a
-correctness fix over the original design doc's one-shot listener, which
-could otherwise misfire later), and starts a `MutationObserver` on the
-video's own `class`/`style` attributes that re-applies `fd-fill-active` if
-an external script strips it (observed on YouTube). Exiting (by any
-means — Exit click, Escape, or the video being removed from the DOM, via
-`content.js` calling `FD.forceExitIfActive(video)` before cleanup) reverses
-all of the above and restores every neutralized ancestor exactly.
+runs the ancestor walk, calls `FD.attachDrag(video)`, shows Play/Pause +
+Mute, adds an `Escape` keydown listener (added on entry, removed on exit
+through *either* path — a correctness fix over the original design doc's
+one-shot listener, which could otherwise misfire later), and starts a
+`MutationObserver` on the video's own `class`/`style` attributes that
+re-applies `fd-fill-active` if an external script strips it (observed on
+YouTube). Exiting (by any means — Exit click, Escape, or the video being
+removed from the DOM, via `content.js` calling `FD.forceExitIfActive(video)`
+before cleanup) reverses all of the above — including `FD.detachDrag(video)`
+and clearing `object-position` back to center — and restores every
+neutralized ancestor exactly.
 
 ## Execution Environment
 
@@ -129,13 +148,14 @@ install layer, then runs `npx playwright test` from `tests/`.
 
 - No `chrome.*` API usage anywhere in the extension — this is intentional
   (§1 of the design doc: "no background worker needed") and is also what
-  makes the test suite possible: both scripts run identically whether
+  makes the test suite possible: all three scripts run identically whether
   loaded as an extension or as plain `<script>` tags on a fixture page.
-- Both files are IIFEs attaching only to `window.__fdExt`; never add a
+- All three files are IIFEs attaching only to `window.__fdExt`; never add a
   bare global.
-- `fillTab.js` before `content.js` in `manifest.json`'s `js` array is load
-  order, not incidental — `content.js` calls into `window.__fdExt` as soon
-  as it runs.
+- `fillTab.js`, then `drag.js`, then `content.js` in `manifest.json`'s `js`
+  array is load order, not incidental — `fillTab.js` calls `FD.attachDrag`/
+  `FD.detachDrag` as soon as fill mode toggles, and `content.js` calls into
+  `window.__fdExt` as soon as it runs.
 - The extension must never insert, move, wrap, or remove any existing
   host-page DOM node. It may only: set attributes/classes/inline styles on
   the `<video>` it targets, temporarily override specific inline-style
@@ -152,9 +172,10 @@ install layer, then runs `npx playwright test` from `tests/`.
 
 - Spec folders are named `<14-digit-timestamp>-<slug>/` and must sort
   strictly after any existing one — see the Spec-Kit Workflow section.
-- Drag-to-reposition is explicitly out of scope for the current spec;
-  don't fold drag work into the Fill-only implementation without a new (or
-  amended) spec.
+- Vertical dragging is explicitly out of scope for the current drag spec
+  (`Specs/20260902121618-drag-to-reposition-fill-video/`); `drag.js` only
+  ever writes the X component of `object-position`, Y stays `50%` — don't
+  fold vertical-axis work into it without a new (or amended) spec.
 - Do not reintroduce the native Fullscreen API for fill mode — it was
   deliberately tried and rejected (see Requirements.md's Problem
   Statement) because it hides browser chrome, which is not the intended
@@ -191,8 +212,8 @@ files to match, don't just fix the code.
 
 - [README.md](README.md) — what the extension does, how to install and
   test it.
-- [CHROME_EXTENSION_FILL_DRAG_REVISED.md](CHROME_EXTENSION_FILL_DRAG_REVISED.md)
-  — the original design doc (historical reference; several mechanisms it
-  describes were superseded — see the spec's Problem Statement).
 - [Specs/20260902101903-chrome-extension-fill-video/](Specs/20260902101903-chrome-extension-fill-video/)
-  — the current spec: `Requirements.md`, `Plan.md`, `Validation.md`.
+  — the Fill-only spec: `Requirements.md`, `Plan.md`, `Validation.md`.
+- [Specs/20260902121618-drag-to-reposition-fill-video/](Specs/20260902121618-drag-to-reposition-fill-video/)
+  — the horizontal drag-to-reposition spec: `Requirements.md`, `Plan.md`,
+  `Validation.md`.

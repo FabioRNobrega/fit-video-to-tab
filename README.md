@@ -42,14 +42,22 @@ subtrees.
 - Exiting (via `Escape` or the "Exit" button) restores the video's
   original `controls` state and every neutralized ancestor's original
   inline style.
+- While filled, dragging the video left/right with a mouse, touch, or pen
+  pans the cropped content horizontally (`object-position`), clamped so
+  the source's edge never falls short of the viewport edge — there's never
+  a visible gap. The crop always resets to center the next time you enter
+  Fill on that video; it isn't remembered across a Fill/Exit cycle.
 
 See [CHROME_EXTENSION_FILL_DRAG_REVISED.md](CHROME_EXTENSION_FILL_DRAG_REVISED.md)
-for the original design doc, and
+for the original design doc,
 [Specs/20260902101903-chrome-extension-fill-video/](Specs/20260902101903-chrome-extension-fill-video/)
-for the full requirements/plan/validation behind the current implementation.
+for the requirements/plan/validation behind the Fill-only slice, and
+[Specs/20260902121618-drag-to-reposition-fill-video/](Specs/20260902121618-drag-to-reposition-fill-video/)
+for horizontal drag-to-reposition.
 
-**Current scope:** the "Fill" button only. Drag-to-reposition (panning a
-filled video) is not implemented yet — see the spec's Out of Scope section.
+**Current scope:** Fill plus horizontal drag-to-reposition. Vertical
+dragging is not implemented yet — see the drag spec's Out of Scope
+section.
 
 ## Install (for testing, unpacked)
 
@@ -75,7 +83,10 @@ script made of plain JS files loaded directly.
    while the browser's own chrome (tabs, address bar) stays visible. Use
    the Play/Pause and Mute buttons that appear alongside "Exit" to control
    playback while filled.
-4. Press `Escape` or click "Exit" to return to the normal in-page view.
+4. Drag left/right on the filled video (mouse, touch, or pen) to pan the
+   cropped content horizontally.
+5. Press `Escape` or click "Exit" to return to the normal in-page view —
+   the crop resets to center for next time.
 
 ## Updating the extension while developing
 
@@ -93,8 +104,9 @@ machine beyond Docker and `make` themselves:
 make test
 ```
 
-It loads `extension/content.js` and `extension/fillTab.js` directly as
-plain `<script>` tags against fixture pages under `tests/fixtures/` that
+It loads `extension/fillTab.js`, `extension/drag.js`, and
+`extension/content.js` directly as plain `<script>` tags against fixture
+pages under `tests/fixtures/` that
 reproduce the DOM shapes behind real bugs found while testing on x.com and
 Reddit (clipping ancestors, a shared multi-video timeline container, a
 stacking-context-creating layout wrapper, a Shadow-DOM-nested video) —
@@ -120,4 +132,5 @@ verification (real extension loading, real third-party sites).
 - Video inside a *closed* Shadow DOM still can't be discovered — this is a
   hard browser restriction, not something a content script can bypass.
 - Cross-origin iframes are out of scope for now.
-- Drag-to-reposition is not implemented yet.
+- Drag-to-reposition only pans horizontally; vertical dragging is not
+  implemented yet.

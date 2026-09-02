@@ -141,6 +141,7 @@
     activeVideo = video;
     activeControls = controls;
     activeAncestors = neutralizeClippingAncestors(video);
+    FD.attachDrag(video);
     controls.fillBtn.textContent = "Exit";
     controls.playPauseBtn.hidden = false;
     controls.muteBtn.hidden = false;
@@ -178,8 +179,9 @@
       escapeHandler = null;
     }
 
+    FD.detachDrag(video);
     video.classList.remove("fd-fill-active");
-    video.style.objectPosition = ""; // drop any crop offset from a future drag feature
+    video.style.objectPosition = ""; // reset drag.js's crop offset back to center
     if (video.dataset.fdControls === "1") {
       video.setAttribute("controls", "");
     }

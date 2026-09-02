@@ -5,7 +5,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["fillTab.js", "content.js"],
+      "js": ["fillTab.js", "drag.js", "content.js"],
       "run_at": "document_idle"
     }
   ]
