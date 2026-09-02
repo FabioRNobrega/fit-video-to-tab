@@ -17,6 +17,8 @@
   let activeAncestors = null; // [{ el, prevCssText }]
   let escapeHandler = null;
   let attrObserver = null;
+  let prevHtmlOverflow = null;
+  let prevBodyOverflow = null;
 
   function injectFillStyle() {
     if (styleInjected) return;
@@ -47,6 +49,17 @@
     video.classList.add("fd-fill-active");
 
     if (FD.requestExclusiveFill) FD.requestExclusiveFill(exitFill);
+
+    // Neutralizing clipping ancestors (below) can expose the video's
+    // fixed, viewport-sized box to a page/root scrollbar it would
+    // otherwise never trigger. Suppress scrolling on the document while
+    // filled and restore whatever was there on exit.
+    prevHtmlOverflow = document.documentElement.style.overflow;
+    prevBodyOverflow = document.body ? document.body.style.overflow : "";
+    document.documentElement.style.setProperty("overflow", "hidden", "important");
+    if (document.body) {
+      document.body.style.setProperty("overflow", "hidden", "important");
+    }
 
     activeVideo = video;
     activeControls = controls;
@@ -102,6 +115,11 @@
 
     FD.restoreAncestors(activeAncestors);
     activeAncestors = null;
+
+    document.documentElement.style.overflow = prevHtmlOverflow;
+    if (document.body) document.body.style.overflow = prevBodyOverflow;
+    prevHtmlOverflow = null;
+    prevBodyOverflow = null;
 
     controls.fillBtn.hidden = false;
     activeVideo = null;
