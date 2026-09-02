@@ -30,3 +30,7 @@ npm-debug.log*
 *.zip
 *.crx
 *.pem
+
+# Internal agent/spec working docs — not part of the shipped project
+AGENTS.md
+Specs/
