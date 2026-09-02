@@ -5,14 +5,15 @@
 // fixed header/sidebar), on sites that nest the video inside clipping,
 // containing-block, or stacking-context-creating ancestors, any such
 // ancestor is temporarily neutralized while filled and restored exactly on
-// exit. Native `controls` are hidden while filled, so content.js's Play/Pause
-// and Mute buttons are shown in their place for the duration.
+// exit. Native `controls` are hidden while filled, so fillControls.js's
+// bottom control bar (play/pause, mute, scrubber, A/B loop, repeat, exit) is
+// attached in its place for the duration.
 (function () {
   const FD = (window.__fdExt = window.__fdExt || {});
 
   let styleInjected = false;
   let activeVideo = null;
-  let activeControls = null; // { fillBtn, playPauseBtn, muteBtn }
+  let activeControls = null; // { fillBtn, shadowRoot }
   let activeAncestors = null; // [{ el, prevCssText }]
   let escapeHandler = null;
   let attrObserver = null;
@@ -51,9 +52,11 @@
     activeControls = controls;
     activeAncestors = FD.neutralizeAncestors(video);
     FD.attachDrag(video);
-    controls.fillBtn.textContent = "Exit";
-    controls.playPauseBtn.hidden = false;
-    controls.muteBtn.hidden = false;
+    FD.attachControls(video, controls);
+    // fillControls.js's bottom bar has its own Exit control, so the
+    // floating icon button is redundant (and, positioned over the video's
+    // corner, visually in the way) once filled — hide it for the duration.
+    controls.fillBtn.hidden = true;
 
     escapeHandler = (e) => {
       if (e.key === "Escape") exitFill();
@@ -88,6 +91,7 @@
       escapeHandler = null;
     }
 
+    FD.detachControls(video);
     FD.detachDrag(video);
     video.classList.remove("fd-fill-active");
     video.style.objectPosition = ""; // reset drag.js's crop offset back to center
@@ -99,9 +103,7 @@
     FD.restoreAncestors(activeAncestors);
     activeAncestors = null;
 
-    controls.fillBtn.textContent = "Fill";
-    controls.playPauseBtn.hidden = true;
-    controls.muteBtn.hidden = true;
+    controls.fillBtn.hidden = false;
     activeVideo = null;
     activeControls = null;
   }

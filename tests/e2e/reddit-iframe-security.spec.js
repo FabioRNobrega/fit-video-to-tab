@@ -22,11 +22,14 @@ test("a Fill request from an unlisted origin is ignored", async ({ page }) => {
   const iframeEl = page.locator("#embed");
   const embedFrame = page.frameLocator("#embed");
 
-  await expect(embedFrame.locator('[data-fd-role="fill"]')).toHaveText("Fill");
+  await expect(embedFrame.locator('[data-fd-role="fill"]')).toHaveAttribute(
+    "aria-label",
+    "Fill video"
+  );
   await embedFrame.locator('[data-fd-role="fill"]').click();
 
-  // The iframe optimistically flips its own row to "Exit", but the top
-  // frame must never apply the fill class since the message's origin
-  // doesn't match the allowlist.
+  // The iframe optimistically hides its own fill icon and attaches the
+  // bar, but the top frame must never apply the fill class since the
+  // message's origin doesn't match the allowlist.
   await expect(iframeEl).not.toHaveClass(/fd-reddit-frame-fill/);
 });

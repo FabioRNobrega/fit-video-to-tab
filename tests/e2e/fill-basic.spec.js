@@ -8,17 +8,24 @@ test.beforeEach(async ({ page }) => {
   await page.goto(FIXTURE);
 });
 
-test("Fill button appears above the video", async ({ page }) => {
-  await expect(page.locator('[data-fd-role="fill"]')).toHaveText("Fill");
+test("Fill button appears as an icon over the video's corner", async ({ page }) => {
+  const fillBtn = page.locator('[data-fd-role="fill"]');
+  await expect(fillBtn).toHaveAttribute("aria-label", "Fill video");
+  await expect(fillBtn.locator("svg")).toBeVisible();
 });
 
-test("clicking Fill fills the viewport and hides native controls", async ({ page }) => {
+test("clicking Fill fills the viewport, hides native controls, and hides the floating fill icon", async ({
+  page,
+}) => {
   const video = page.locator("#v1");
   const fillBtn = page.locator('[data-fd-role="fill"]');
 
   await fillBtn.click();
 
-  await expect(fillBtn).toHaveText("Exit");
+  // The bottom bar has its own Exit control once filled, so the floating
+  // icon (which would otherwise sit over the video's corner) hides for
+  // the duration rather than flipping to an "exit" icon.
+  await expect(fillBtn).toBeHidden();
   await expect(video).toHaveClass(/fd-fill-active/);
   await expect(video).not.toHaveAttribute("controls", "");
 
@@ -28,32 +35,43 @@ test("clicking Fill fills the viewport and hides native controls", async ({ page
   expect(box.height).toBeCloseTo(viewport.height, 0);
 });
 
-test("Escape exits fill mode and restores controls", async ({ page }) => {
+test("Escape exits fill mode, restores controls, and reveals the floating fill icon again", async ({
+  page,
+}) => {
   const video = page.locator("#v1");
   const fillBtn = page.locator('[data-fd-role="fill"]');
 
   await fillBtn.click();
   await expect(video).toHaveClass(/fd-fill-active/);
+  await expect(fillBtn).toBeHidden();
 
   await page.keyboard.press("Escape");
 
-  await expect(fillBtn).toHaveText("Fill");
+  await expect(fillBtn).toBeVisible();
+  await expect(fillBtn).toHaveAttribute("aria-label", "Fill video");
   await expect(video).not.toHaveClass(/fd-fill-active/);
   await expect(video).toHaveAttribute("controls", "");
 });
 
-test("clicking Exit also exits fill mode", async ({ page }) => {
+test("clicking the bar's Exit button also exits fill mode", async ({ page }) => {
   const video = page.locator("#v1");
   const fillBtn = page.locator('[data-fd-role="fill"]');
+  const exitBtn = page.locator('[data-fd-role="exit"]');
 
   await fillBtn.click();
-  await fillBtn.click(); // now labeled "Exit"
+  // The bar is hidden (pointer-events: none) until the pointer moves over
+  // it, per FR9 — reveal it first or the click hit-tests through to the
+  // video underneath.
+  await video.dispatchEvent("mousemove");
+  await exitBtn.click();
 
-  await expect(fillBtn).toHaveText("Fill");
+  await expect(fillBtn).toBeVisible();
+  await expect(fillBtn).toHaveAttribute("aria-label", "Fill video");
   await expect(video).not.toHaveClass(/fd-fill-active/);
 });
 
-test("Play/Pause and Mute buttons are hidden until filled, then shown", async ({ page }) => {
+test("control bar (Play/Pause, Mute) is absent until filled, then present", async ({ page }) => {
+  const video = page.locator("#v1");
   const fillBtn = page.locator('[data-fd-role="fill"]');
   const playPauseBtn = page.locator('[data-fd-role="play-pause"]');
   const muteBtn = page.locator('[data-fd-role="mute"]');
@@ -66,7 +84,7 @@ test("Play/Pause and Mute buttons are hidden until filled, then shown", async ({
   await expect(playPauseBtn).toBeVisible();
   await expect(muteBtn).toBeVisible();
 
-  await fillBtn.click(); // exit
+  await page.keyboard.press("Escape"); // exit — fillBtn is hidden while filled
 
   await expect(playPauseBtn).toBeHidden();
   await expect(muteBtn).toBeHidden();
@@ -80,6 +98,11 @@ test("Mute button toggles video.muted and updates its label", async ({ page }) =
   await fillBtn.click();
   expect(await video.evaluate((el) => el.muted)).toBe(false);
 
+  // The bar is hidden (pointer-events: none) until the pointer moves over
+  // it, per FR9 — reveal it first or the click hit-tests through to the
+  // video underneath.
+  await video.dispatchEvent("mousemove");
+
   await muteBtn.click();
   expect(await video.evaluate((el) => el.muted)).toBe(true);
   await expect(muteBtn).toHaveText("🔇");
@@ -89,7 +112,7 @@ test("Mute button toggles video.muted and updates its label", async ({ page }) =
   await expect(muteBtn).toHaveText("🔊");
 });
 
-test("Play/Pause button calls video.play()/pause() and its label follows real play/pause events", async ({
+test("Play/Pause button calls video.play()/pause() and its icon follows real play/pause events", async ({
   page,
 }) => {
   const fillBtn = page.locator('[data-fd-role="fill"]');
@@ -98,7 +121,7 @@ test("Play/Pause button calls video.play()/pause() and its label follows real pl
   // The fixture video has no decodable source, so play()/pause() are
   // stubbed here to avoid relying on real media decode inside the
   // container — this still exercises the extension's actual click wiring
-  // and its "paused"/"play"/"pause" event-driven label sync.
+  // and its "paused"/"play"/"pause" event-driven icon sync.
   await page.locator("#v1").evaluate((el) => {
     let paused = true;
     Object.defineProperty(el, "paused", { get: () => paused });
@@ -114,11 +137,16 @@ test("Play/Pause button calls video.play()/pause() and its label follows real pl
   });
 
   await fillBtn.click();
-  await expect(playPauseBtn).toHaveText("▶");
+  await expect(playPauseBtn).toHaveAttribute("aria-label", "Play");
+
+  // The bar is hidden (pointer-events: none) until the pointer moves over
+  // it, per FR9 — reveal it first or the click hit-tests through to the
+  // video underneath.
+  await page.locator("#v1").dispatchEvent("mousemove");
 
   await playPauseBtn.click();
-  await expect(playPauseBtn).toHaveText("⏸");
+  await expect(playPauseBtn).toHaveAttribute("aria-label", "Pause");
 
   await playPauseBtn.click();
-  await expect(playPauseBtn).toHaveText("▶");
+  await expect(playPauseBtn).toHaveAttribute("aria-label", "Play");
 });

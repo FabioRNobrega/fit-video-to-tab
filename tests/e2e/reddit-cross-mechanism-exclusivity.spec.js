@@ -35,7 +35,7 @@ test("filling the embed iframe evicts an active generic-path fill", async ({ pag
 
   await expect(iframeEl).toHaveClass(/fd-reddit-frame-fill/);
   await expect(nativeVideo).not.toHaveClass(/fd-fill-active/);
-  await expect(nativeFillBtn).toHaveText("Fill");
+  await expect(nativeFillBtn).toHaveAttribute("aria-label", "Fill video");
 });
 
 test("filling the generic-path video evicts an active embed-iframe fill", async ({ page }) => {
@@ -51,5 +51,8 @@ test("filling the generic-path video evicts an active embed-iframe fill", async 
 
   await expect(nativeVideo).toHaveClass(/fd-fill-active/);
   await expect(iframeEl).not.toHaveClass(/fd-reddit-frame-fill/);
-  await expect(embedFrame.locator('[data-fd-role="fill"]')).toHaveText("Fill");
+  await expect(embedFrame.locator('[data-fd-role="fill"]')).toHaveAttribute(
+    "aria-label",
+    "Fill video"
+  );
 });

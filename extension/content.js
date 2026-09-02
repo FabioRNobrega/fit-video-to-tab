@@ -1,10 +1,13 @@
-// Video discovery, the sibling shadow-DOM overlay, and per-video button-row
-// lifecycle. Never touches the host page's own DOM tree structure beyond
-// appending one sibling node to <body> and setting attributes on the
-// <video> elements themselves (see the design doc for why).
+// Video discovery, the sibling shadow-DOM overlay, and per-video floating
+// fill-icon-button lifecycle. The bottom control bar itself lives in
+// fillControls.js, attached/detached by fillTab.js's enter/exit lifecycle —
+// this file only owns the always-present fill/exit icon button. Never
+// touches the host page's own DOM tree structure beyond appending one
+// sibling node to <body> and setting attributes on the <video> elements
+// themselves (see the design doc for why).
 (function () {
   const FD = (window.__fdExt = window.__fdExt || {});
-  const ROW_HEIGHT = 28;
+  const ICON_INSET = 8;
 
   FD.injectFillStyle();
 
@@ -13,63 +16,56 @@
     "position: fixed; top: 0; left: 0; pointer-events: none; z-index: 2147483647;";
   document.body.appendChild(overlayHost);
   const shadow = overlayHost.attachShadow({ mode: "open" });
+  FD.getOverlayShadowRoot = () => shadow;
 
-  const rowStyle = document.createElement("style");
-  rowStyle.textContent = [
-    ".fd-row {",
+  const fillBtnStyle = document.createElement("style");
+  fillBtnStyle.textContent = [
+    ".fd-fill-btn {",
     "  position: fixed;",
     "  pointer-events: auto;",
-    "  display: flex;",
-    "  gap: 4px;",
     "  z-index: 2147483647;",
-    "}",
-    ".fd-row button {",
-    "  font: 12px sans-serif;",
-    "  padding: 2px 8px;",
+    "  width: 32px;",
+    "  height: 32px;",
+    "  padding: 0;",
+    "  border: none;",
+    "  border-radius: 50%;",
+    "  display: flex;",
+    "  align-items: center;",
+    "  justify-content: center;",
+    "  background: rgba(0, 0, 0, 0.55);",
+    "  color: #fff;",
     "  cursor: pointer;",
     "}",
-    ".fd-row [hidden] {",
+    ".fd-fill-btn:hover {",
+    "  background: rgba(0, 0, 0, 0.75);",
+    "}",
+    ".fd-fill-btn svg {",
+    "  width: 18px;",
+    "  height: 18px;",
+    "}",
+    ".fd-fill-btn[hidden] {",
     "  display: none;",
     "}",
   ].join("\n");
-  shadow.appendChild(rowStyle);
+  shadow.appendChild(fillBtnStyle);
 
-  const videoState = new WeakMap(); // video -> { row, resizeObserver, cleanup }
+  const videoState = new WeakMap(); // video -> { fillBtn, resizeObserver, cleanup }
 
-  function attachButtonRow(video) {
+  function attachFillButton(video) {
     if (videoState.has(video)) return;
-
-    const row = document.createElement("div");
-    row.className = "fd-row";
 
     const fillBtn = document.createElement("button");
     fillBtn.type = "button";
-    fillBtn.textContent = "Fill";
+    fillBtn.className = "fd-fill-btn";
     fillBtn.dataset.fdRole = "fill";
-    row.appendChild(fillBtn);
-
-    // Native controls are hidden while filled, so these two stand in for
-    // play/pause and mute — only shown while this video is filled (FD
-    // toggles their `hidden` state on enter/exit).
-    const playPauseBtn = document.createElement("button");
-    playPauseBtn.type = "button";
-    playPauseBtn.dataset.fdRole = "play-pause";
-    playPauseBtn.hidden = true;
-    row.appendChild(playPauseBtn);
-
-    const muteBtn = document.createElement("button");
-    muteBtn.type = "button";
-    muteBtn.dataset.fdRole = "mute";
-    muteBtn.hidden = true;
-    row.appendChild(muteBtn);
-
-    shadow.appendChild(row);
+    fillBtn.setAttribute("aria-label", "Fill video");
+    fillBtn.innerHTML = FD.ICONS.fullscreen;
+    shadow.appendChild(fillBtn);
 
     function syncPosition() {
       const rect = video.getBoundingClientRect();
-      row.style.left = `${rect.left}px`;
-      row.style.top = `${Math.max(0, rect.top - ROW_HEIGHT)}px`;
-      row.style.width = `${rect.width}px`;
+      fillBtn.style.left = `${rect.left + ICON_INSET}px`;
+      fillBtn.style.top = `${rect.top + ICON_INSET}px`;
     }
 
     const resizeObserver = new ResizeObserver(syncPosition);
@@ -81,46 +77,24 @@
     window.addEventListener("resize", syncPosition);
     syncPosition();
 
-    function updatePlayPauseLabel() {
-      playPauseBtn.textContent = video.paused ? "▶" : "⏸";
-    }
-    function updateMuteLabel() {
-      muteBtn.textContent = video.muted ? "🔇" : "🔊";
-    }
-    updatePlayPauseLabel();
-    updateMuteLabel();
-    video.addEventListener("play", updatePlayPauseLabel);
-    video.addEventListener("pause", updatePlayPauseLabel);
-    video.addEventListener("volumechange", updateMuteLabel);
-
-    playPauseBtn.addEventListener("click", () => {
-      if (video.paused) video.play();
-      else video.pause();
-    });
-    muteBtn.addEventListener("click", () => {
-      video.muted = !video.muted;
-    });
-
-    const controls = { fillBtn, playPauseBtn, muteBtn };
+    const controls = { fillBtn, shadowRoot: shadow };
+    controls.onExit = () => FD.toggleFill(video, controls);
     fillBtn.addEventListener("click", () => FD.toggleFill(video, controls));
 
     videoState.set(video, {
-      row,
+      fillBtn,
       resizeObserver,
       cleanup() {
         resizeObserver.disconnect();
         window.removeEventListener("scroll", syncPosition, true);
         window.removeEventListener("resize", syncPosition);
-        video.removeEventListener("play", updatePlayPauseLabel);
-        video.removeEventListener("pause", updatePlayPauseLabel);
-        video.removeEventListener("volumechange", updateMuteLabel);
-        row.remove();
+        fillBtn.remove();
         videoState.delete(video);
       },
     });
   }
 
-  function detachButtonRow(video) {
+  function detachFillButton(video) {
     const entry = videoState.get(video);
     if (entry) {
       FD.forceExitIfActive(video);
@@ -140,7 +114,7 @@
     observedRoots.add(root);
 
     if (root.querySelectorAll) {
-      root.querySelectorAll("video").forEach(attachButtonRow);
+      root.querySelectorAll("video").forEach(attachFillButton);
       root.querySelectorAll("*").forEach((el) => {
         if (el.shadowRoot) observeRoot(el.shadowRoot);
       });
@@ -157,10 +131,10 @@
 
   function scanAdded(node) {
     if (node.nodeType !== Node.ELEMENT_NODE) return;
-    if (node.tagName === "VIDEO") attachButtonRow(node);
+    if (node.tagName === "VIDEO") attachFillButton(node);
     if (node.shadowRoot) observeRoot(node.shadowRoot);
     if (node.querySelectorAll) {
-      node.querySelectorAll("video").forEach(attachButtonRow);
+      node.querySelectorAll("video").forEach(attachFillButton);
       node.querySelectorAll("*").forEach((el) => {
         if (el.shadowRoot) observeRoot(el.shadowRoot);
       });
@@ -169,9 +143,9 @@
 
   function scanRemoved(node) {
     if (node.nodeType !== Node.ELEMENT_NODE) return;
-    if (node.tagName === "VIDEO") detachButtonRow(node);
+    if (node.tagName === "VIDEO") detachFillButton(node);
     if (node.querySelectorAll) {
-      node.querySelectorAll("video").forEach(detachButtonRow);
+      node.querySelectorAll("video").forEach(detachFillButton);
     }
   }
 

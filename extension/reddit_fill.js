@@ -17,7 +17,6 @@
 (function () {
   const FD = (window.__fdExt = window.__fdExt || {});
   const MESSAGE_TYPE = "fd-reddit-fill";
-  const ROW_HEIGHT = 28;
 
   // Origins this script is willing to accept fill requests from. Kept in
   // sync with extension/manifest.json's second content_scripts entry —
@@ -143,39 +142,58 @@
 
   // ------------------------------------------------------------------
   // Embed iframe (redgifs.com, etc.): discovers <video> elements in its own
-  // document and attaches a button row, same data-fd-role convention as
-  // content.js. Fill/Exit clicks postMessage the top frame instead of
-  // touching the video's own styles; Play/Pause and Mute act on the local
-  // video directly.
+  // document and attaches the same floating fill icon + fillControls.js
+  // bottom bar that content.js/fillTab.js use for the generic path (see
+  // Specs/20260902151129-fill-mode-control-bar/) — reused here via
+  // FD.attachControls/FD.detachControls, since that module only needs the
+  // local <video> and a shadow root, not fillTab.js's fill-class/ancestor
+  // machinery. Fill/Exit still postMessage the top frame instead of
+  // touching the video's own styles (see module header); the bar's own
+  // Exit control is wired to this frame's requestExit via
+  // controls.onExit rather than fillControls.js's default FD.toggleFill,
+  // which isn't loaded in this frame.
   // ------------------------------------------------------------------
   function initEmbedFrame() {
+    const ICON_INSET = 8;
+
     const overlayHost = document.createElement("div");
     overlayHost.style.cssText =
       "position: fixed; top: 0; left: 0; pointer-events: none; z-index: 2147483647;";
     document.body.appendChild(overlayHost);
     const shadow = overlayHost.attachShadow({ mode: "open" });
 
-    const rowStyle = document.createElement("style");
-    rowStyle.textContent = [
-      ".fd-row {",
+    const fillBtnStyle = document.createElement("style");
+    fillBtnStyle.textContent = [
+      ".fd-fill-btn {",
       "  position: fixed;",
       "  pointer-events: auto;",
-      "  display: flex;",
-      "  gap: 4px;",
       "  z-index: 2147483647;",
-      "}",
-      ".fd-row button {",
-      "  font: 12px sans-serif;",
-      "  padding: 2px 8px;",
+      "  width: 32px;",
+      "  height: 32px;",
+      "  padding: 0;",
+      "  border: none;",
+      "  border-radius: 50%;",
+      "  display: flex;",
+      "  align-items: center;",
+      "  justify-content: center;",
+      "  background: rgba(0, 0, 0, 0.55);",
+      "  color: #fff;",
       "  cursor: pointer;",
       "}",
-      ".fd-row [hidden] {",
+      ".fd-fill-btn:hover {",
+      "  background: rgba(0, 0, 0, 0.75);",
+      "}",
+      ".fd-fill-btn svg {",
+      "  width: 18px;",
+      "  height: 18px;",
+      "}",
+      ".fd-fill-btn[hidden] {",
       "  display: none;",
       "}",
     ].join("\n");
-    shadow.appendChild(rowStyle);
+    shadow.appendChild(fillBtnStyle);
 
-    const videoState = new WeakMap(); // video -> { row, resizeObserver, filled, cleanup }
+    const videoState = new WeakMap(); // video -> { fillBtn, resizeObserver, cleanup }
     let filledVideo = null;
 
     function sendToTop(action) {
@@ -184,39 +202,38 @@
       }
     }
 
-    function setFilledLabel(entry, filled) {
-      entry.row.dataset.fdFilled = filled ? "1" : "0";
-      entry.fillBtn.textContent = filled ? "Exit" : "Fill";
-      entry.playPauseBtn.hidden = !filled;
-      entry.muteBtn.hidden = !filled;
-    }
-
     function requestEnter(video, entry) {
       if (filledVideo && filledVideo !== video) {
         const prevEntry = videoState.get(filledVideo);
-        if (prevEntry) setFilledLabel(prevEntry, false);
+        if (prevEntry) {
+          FD.detachControls(filledVideo);
+          prevEntry.fillBtn.hidden = false;
+        }
       }
       filledVideo = video;
-      setFilledLabel(entry, true);
+      FD.attachControls(video, { shadowRoot: shadow, onExit: () => requestExit(video, entry) });
+      entry.fillBtn.hidden = true;
       sendToTop("enter");
     }
 
     function requestExit(video, entry) {
       if (filledVideo !== video) return;
       filledVideo = null;
-      setFilledLabel(entry, false);
+      FD.detachControls(video);
+      entry.fillBtn.hidden = false;
       sendToTop("exit");
     }
 
     // The top frame's own Escape listener, or an eviction via
     // FD.requestExclusiveFill on that side, exits without this iframe
-    // asking first — reset the button row to match.
+    // asking first — reset the fill icon and tear down the bar to match.
     window.addEventListener("message", (event) => {
       const data = event.data;
       if (!data || data.type !== MESSAGE_TYPE) return;
       if (data.action === "exited" && filledVideo) {
         const entry = videoState.get(filledVideo);
-        if (entry) setFilledLabel(entry, false);
+        FD.detachControls(filledVideo);
+        if (entry) entry.fillBtn.hidden = false;
         filledVideo = null;
       }
     });
@@ -230,34 +247,18 @@
     function attachButtonRow(video) {
       if (videoState.has(video)) return;
 
-      const row = document.createElement("div");
-      row.className = "fd-row";
-
       const fillBtn = document.createElement("button");
       fillBtn.type = "button";
-      fillBtn.textContent = "Fill";
+      fillBtn.className = "fd-fill-btn";
       fillBtn.dataset.fdRole = "fill";
-      row.appendChild(fillBtn);
-
-      const playPauseBtn = document.createElement("button");
-      playPauseBtn.type = "button";
-      playPauseBtn.dataset.fdRole = "play-pause";
-      playPauseBtn.hidden = true;
-      row.appendChild(playPauseBtn);
-
-      const muteBtn = document.createElement("button");
-      muteBtn.type = "button";
-      muteBtn.dataset.fdRole = "mute";
-      muteBtn.hidden = true;
-      row.appendChild(muteBtn);
-
-      shadow.appendChild(row);
+      fillBtn.setAttribute("aria-label", "Fill video");
+      fillBtn.innerHTML = FD.ICONS.fullscreen;
+      shadow.appendChild(fillBtn);
 
       function syncPosition() {
         const rect = video.getBoundingClientRect();
-        row.style.left = `${rect.left}px`;
-        row.style.top = `${Math.max(0, rect.top - ROW_HEIGHT)}px`;
-        row.style.width = `${rect.width}px`;
+        fillBtn.style.left = `${rect.left + ICON_INSET}px`;
+        fillBtn.style.top = `${rect.top + ICON_INSET}px`;
       }
 
       const resizeObserver = new ResizeObserver(syncPosition);
@@ -266,41 +267,15 @@
       window.addEventListener("resize", syncPosition);
       syncPosition();
 
-      function updatePlayPauseLabel() {
-        playPauseBtn.textContent = video.paused ? "▶" : "⏸";
-      }
-      function updateMuteLabel() {
-        muteBtn.textContent = video.muted ? "🔇" : "🔊";
-      }
-      updatePlayPauseLabel();
-      updateMuteLabel();
-      video.addEventListener("play", updatePlayPauseLabel);
-      video.addEventListener("pause", updatePlayPauseLabel);
-      video.addEventListener("volumechange", updateMuteLabel);
-
-      playPauseBtn.addEventListener("click", () => {
-        if (video.paused) video.play();
-        else video.pause();
-      });
-      muteBtn.addEventListener("click", () => {
-        video.muted = !video.muted;
-      });
-
       const entry = {
-        row,
         fillBtn,
-        playPauseBtn,
-        muteBtn,
         resizeObserver,
         cleanup() {
           if (filledVideo === video) requestExit(video, entry);
           resizeObserver.disconnect();
           window.removeEventListener("scroll", syncPosition, true);
           window.removeEventListener("resize", syncPosition);
-          video.removeEventListener("play", updatePlayPauseLabel);
-          video.removeEventListener("pause", updatePlayPauseLabel);
-          video.removeEventListener("volumechange", updateMuteLabel);
-          row.remove();
+          fillBtn.remove();
           videoState.delete(video);
         },
       };

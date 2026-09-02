@@ -36,12 +36,15 @@ subtrees.
   one video never un-clips or repositions another; stacking overrides
   (`z-index`, `position`, `opacity`, etc.) keep going past that point,
   since they only change paint order and can't reveal another video.
-- Since native `controls` are hidden while filled, dedicated Play/Pause
-  and Mute buttons appear in their place for as long as that video is
-  filled, and disappear again on exit.
-- Exiting (via `Escape` or the "Exit" button) restores the video's
-  original `controls` state and every neutralized ancestor's original
-  inline style.
+- Before it's filled, each video gets a small circular Fill icon over its
+  top-left corner. Once filled, native `controls` are hidden and that icon
+  hides too — a bottom control bar fades in on movement instead, with
+  play/pause, mute, a progress scrubber, standard repeat, A/B loop points,
+  and Exit; it fades out again after ~2 seconds of no pointer activity
+  (and never hides mid-scrub).
+- Exiting (via `Escape` or the bar's Exit button) restores the video's
+  original `controls` state, every neutralized ancestor's original inline
+  style, and brings the floating Fill icon back.
 - While filled, dragging the video left/right with a mouse, touch, or pen
   pans the cropped content horizontally (`object-position`), clamped so
   the source's edge never falls short of the viewport edge — there's never
@@ -51,26 +54,35 @@ subtrees.
   also Imgur/Streamable) inside a cross-origin `<iframe>`, so the video
   isn't reachable — or fillable in place — the same way as on the rest of
   a page. A separate mechanism, scoped only to Reddit and those
-  embed-provider domains, still gets a Fill button next to that video;
-  clicking it fills the *iframe* itself to the full tab instead of the
-  video directly (the only way to reach the real viewport from inside a
-  cross-origin frame), coordinated behind the scenes so it never touches
-  the sites the main mechanism already handles.
+  embed-provider domains, still gets the same Fill icon next to that
+  video, and the same bottom control bar for its local play/pause/mute/
+  scrub/loop controls; clicking Fill sends the *iframe* itself to the full
+  tab instead of the video directly (the only way to reach the real
+  viewport from inside a cross-origin frame), coordinated behind the
+  scenes so it never touches the sites the main mechanism already
+  handles.
 
 See [CHROME_EXTENSION_FILL_DRAG_REVISED.md](CHROME_EXTENSION_FILL_DRAG_REVISED.md)
 for the original design doc,
 [Specs/20260902101903-chrome-extension-fill-video/](Specs/20260902101903-chrome-extension-fill-video/)
 for the requirements/plan/validation behind the Fill-only slice,
 [Specs/20260902121618-drag-to-reposition-fill-video/](Specs/20260902121618-drag-to-reposition-fill-video/)
-for horizontal drag-to-reposition, and
+for horizontal drag-to-reposition,
 [Specs/20260902124537-reddit-iframe-embed-fill/](Specs/20260902124537-reddit-iframe-embed-fill/)
-for the Reddit cross-origin embed iframe case.
+for the Reddit cross-origin embed iframe case, and
+[Specs/20260902151129-fill-mode-control-bar/](Specs/20260902151129-fill-mode-control-bar/)
+for the bottom control bar and floating Fill icon (including its later
+reuse in the Reddit embed frame).
 
-**Current scope:** Fill plus horizontal drag-to-reposition, plus Reddit
-cross-origin embed iframe fill (RedGIFs primarily, best-effort for Imgur/
-Streamable). Vertical dragging is not implemented yet — see the drag
-spec's Out of Scope section. Drag-to-reposition is not available for
-Reddit-embedded videos — see the Reddit spec's Out of Scope section.
+**Current scope:** Fill (icon button + bottom control bar: play/pause,
+mute, scrub, standard repeat, A/B loop, exit), horizontal
+drag-to-reposition on the generic path, and Reddit cross-origin embed
+iframe fill (RedGIFs primarily, best-effort for Imgur/Streamable) sharing
+the same control bar locally. Vertical dragging is not implemented yet —
+see the drag spec's Out of Scope section. Drag-to-reposition (panning the
+video's crop) is not available for Reddit-embedded videos — see the
+Reddit spec's Out of Scope section; the shared control bar's other
+features (scrub, loop, play/pause, mute) are available there.
 
 ## Install (for testing, unpacked)
 
@@ -91,15 +103,17 @@ script made of plain JS files loaded directly.
 
 1. Open any page with a `<video>` element (a plain HTML5 video page,
    youtube.com, a tweet on x.com with a video, or a Reddit video post).
-2. A small "Fill" button appears just above the video.
+2. A small circular Fill icon appears over the video's top-left corner.
 3. Click it — the video fills the tab, cropped via `object-fit: cover`,
-   while the browser's own chrome (tabs, address bar) stays visible. Use
-   the Play/Pause and Mute buttons that appear alongside "Exit" to control
-   playback while filled.
-4. Drag left/right on the filled video (mouse, touch, or pen) to pan the
-   cropped content horizontally.
-5. Press `Escape` or click "Exit" to return to the normal in-page view —
-   the crop resets to center for next time.
+   while the browser's own chrome (tabs, address bar) stays visible. Move
+   the pointer over the video to reveal the bottom control bar (play/
+   pause, mute, scrub, standard repeat, A/B loop, exit); it fades out
+   again after a couple of seconds of no movement.
+4. Drag left/right on the filled video itself (mouse, touch, or pen) to
+   pan the cropped content horizontally.
+5. Press `Escape` or click the bar's Exit button to return to the normal
+   in-page view — the crop resets to center and the floating Fill icon
+   reappears for next time.
 
 ## Updating the extension while developing
 
@@ -117,14 +131,16 @@ machine beyond Docker and `make` themselves:
 make test
 ```
 
-It loads `extension/fillTab.js`, `extension/drag.js`, and
-`extension/content.js` directly as plain `<script>` tags against fixture
-pages under `tests/fixtures/` that
+It loads `extension/ancestorOverrides.js`, `extension/fillTab.js`,
+`extension/drag.js`, `extension/fillControls.js`, `extension/content.js`,
+and (for the Reddit embed case) `extension/reddit_fill.js` directly as
+plain `<script>` tags against fixture pages under `tests/fixtures/` that
 reproduce the DOM shapes behind real bugs found while testing on x.com and
 Reddit (clipping ancestors, a shared multi-video timeline container, a
-stacking-context-creating layout wrapper, a Shadow-DOM-nested video) —
-this works because the content script has no `chrome.*` dependency, so it
-runs identically whether loaded as an extension or a page script.
+stacking-context-creating layout wrapper, a Shadow-DOM-nested video, a
+cross-origin embed iframe) — this works because none of these scripts use
+any `chrome.*` API, so they run identically whether loaded as an
+extension or as plain page scripts.
 
 `make test-build` builds the image without running it; `make test-clean`
 removes it. See
@@ -144,6 +160,9 @@ verification (real extension loading, real third-party sites).
   against every possible page structure.
 - Video inside a *closed* Shadow DOM still can't be discovered — this is a
   hard browser restriction, not something a content script can bypass.
-- Cross-origin iframes are out of scope for now.
-- Drag-to-reposition only pans horizontally; vertical dragging is not
+- Cross-origin iframes are supported for Reddit's known embed providers
+  (RedGIFs, best-effort Imgur/Streamable) only — an arbitrary third-party
+  embed on some other site isn't covered.
+- Drag-to-reposition only pans horizontally, is generic-path only (not
+  available for Reddit-embedded videos), and vertical dragging is not
   implemented yet.

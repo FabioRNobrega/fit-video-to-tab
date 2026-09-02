@@ -106,7 +106,7 @@ test("dragging far past either edge clamps at 0 and 100, never beyond", async ({
   expect(await objectPositionX(page)).toBe(100);
   await dispatchPointer(page, "pointerup", { pointerId: 1, clientX: 500 - farDelta });
 
-  await page.locator('[data-fd-role="fill"]').click(); // exit, resets to center
+  await page.keyboard.press("Escape"); // exit, resets to center — fillBtn is hidden while filled
   const rect2 = await enterFillAndGetRect(page); // re-enter
   await stubIntrinsicSize(page, rect2.width * 2, rect2.height);
   const farDelta2 = rect2.width * 20 + 5000;

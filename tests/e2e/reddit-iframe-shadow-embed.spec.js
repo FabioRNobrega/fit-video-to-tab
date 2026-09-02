@@ -23,7 +23,10 @@ function embedFrame(page) {
 }
 
 test("a video inside a shadow-nested embed iframe gets a Fill button", async ({ page }) => {
-  await expect(embedFrame(page).locator('[data-fd-role="fill"]')).toHaveText("Fill");
+  await expect(embedFrame(page).locator('[data-fd-role="fill"]')).toHaveAttribute(
+    "aria-label",
+    "Fill video"
+  );
 });
 
 test("Fill actually fills a shadow-nested embed iframe to the viewport", async ({ page }) => {

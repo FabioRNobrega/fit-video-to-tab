@@ -28,11 +28,16 @@ isolated test suite under `tests/`, not to the extension itself.
 - `extension/` — the shipped Manifest V3 extension: `manifest.json`,
   `ancestorOverrides.js` (shared ancestor clipping/stacking-override walk
   and the cross-module fill-exclusivity arbiter), `content.js` (video
-  discovery, the shadow-DOM overlay, button-row lifecycle), `fillTab.js`
-  (fill-mode state machine, Play/Pause + Mute wiring), `drag.js`
+  discovery, the shadow-DOM overlay, floating fill/exit icon-button
+  lifecycle), `fillTab.js` (fill-mode state machine, wiring
+  `drag.js`/`fillControls.js` in and out on enter/exit), `drag.js`
   (horizontal drag-to-reposition for the currently-filled video, wired
-  into `fillTab.js`'s enter/exit lifecycle), `reddit_fill.js` (Reddit
-  cross-origin embed-iframe fill — RedGIFs primarily, also Imgur/
+  into `fillTab.js`'s enter/exit lifecycle), `fillControls.js` (the
+  bottom control bar shown only while filled — play/pause, mute, progress
+  scrubber, standard repeat, A/B loop, exit; also the inline-SVG
+  `FD.ICONS` shared with `content.js`/`fillTab.js`'s fill-icon button;
+  see `Specs/20260902151129-fill-mode-control-bar/`), `reddit_fill.js`
+  (Reddit cross-origin embed-iframe fill — RedGIFs primarily, also Imgur/
   Streamable — a separate mechanism loaded only on those domains; see
   Architecture Summary).
 - `tests/` — a self-contained Playwright regression suite (Dockerized —
@@ -47,11 +52,14 @@ isolated test suite under `tests/`, not to the extension itself.
   `tests/package.json`/`playwright.config.js` are scoped to `tests/` only,
   not the repo root.
 - `Specs/` — SDD-style spec folders (`<14-digit-timestamp>-<slug>/`), each
-  with `Requirements.md`, `Plan.md`, `Validation.md`. Three specs so far:
+  with `Requirements.md`, `Plan.md`, `Validation.md`. Four specs so far:
   `20260902101903-chrome-extension-fill-video/` (the Fill-only slice),
   `20260902121618-drag-to-reposition-fill-video/` (horizontal
   drag-to-reposition; vertical dragging remains a further follow-up — see
-  that spec's Out of Scope), and
+  that spec's Out of Scope),
+  `20260902151129-fill-mode-control-bar/` (the bottom control bar — play/
+  pause, mute, progress scrubber, standard repeat, A/B loop, exit — and
+  the floating fill-icon button), and
   `20260902124537-reddit-iframe-embed-fill/` (Reddit cross-origin embed
   iframe fill — RedGIFs primarily, also Imgur/Streamable).
 - `README.md` — user-facing: what the extension does, how it works, how
@@ -70,9 +78,13 @@ then `content.js` — communicating through one shared namespace object,
 colliding with the host page's own global scope). The second entry
 matches only `reddit.com` plus known embed-provider domains
 (`redgifs.com`, `imgur.com`, `streamable.com`), sets `all_frames: true`,
-and loads `ancestorOverrides.js` + `reddit_fill.js` — see "Reddit
-cross-origin embed fill" below for why this is a second, independent
-entry rather than an extension of the first.
+and loads `ancestorOverrides.js` + `fillControls.js` + `reddit_fill.js`
+(`fillControls.js` is included here too so the embed-iframe frame — a
+genuinely separate document/window from the top frame, unlike the two
+entries' shared world on `reddit.com`'s own top frame — has
+`FD.attachControls`/`FD.detachControls`/`FD.ICONS` available; see "Reddit
+cross-origin embed fill" below) — see that section for why this is a
+second, independent entry rather than an extension of the first.
 
 - **`ancestorOverrides.js`** holds the ancestor clipping/stacking-override
   walk (`FD.neutralizeAncestors(startElement)` /
@@ -87,11 +99,16 @@ entry rather than an extension of the first.
   *open* Shadow DOM subtrees (`observeRoot(root)`, generalized to work on
   `document.body` or any discovered `shadowRoot` alike, tracked via a
   `WeakSet` so each root is only scanned/observed once). For each video it
-  creates a button row (Fill/Exit, Play/Pause, Mute — tagged with
-  `data-fd-role` attributes for testability) inside the shared shadow
-  root, kept glued to the video via `ResizeObserver` + scroll/resize
-  listeners computing `getBoundingClientRect()`. Per-video state (row,
-  `ResizeObserver`, `cleanup()`) lives in a `WeakMap`.
+  creates one small circular fill-icon button (`data-fd-role="fill"`,
+  `FD.ICONS.fullscreen`, no text) inside the shared shadow root, kept
+  glued to the video's top-left corner via `ResizeObserver` + scroll/resize
+  listeners computing `getBoundingClientRect()`. Per-video state (button,
+  `ResizeObserver`, `cleanup()`) lives in a `WeakMap`. Play/Pause and Mute
+  no longer live in a row here — they moved into `fillControls.js`'s
+  bottom bar (see `Specs/20260902151129-fill-mode-control-bar/`); this
+  icon button hides entirely while its video is filled (`fillTab.js`
+  toggles `controls.fillBtn.hidden`) rather than relabeling to "Exit",
+  since the bar's own Exit control covers that.
 - **`fillTab.js`** owns fill-mode's state machine for whichever single
   video is currently filled (module-level variables, not a `WeakMap` — the
   design only ever supports one filled video at a time). Filling toggles a
@@ -135,20 +152,23 @@ entry rather than an extension of the first.
 
 ### Fill lifecycle
 
-`content.js`'s Fill button calls `fillTab.js`'s `toggleFill(video,
-controls)`, where `controls` is `{ fillBtn, playPauseBtn, muteBtn }`.
-Entering fill mode: adds the class, snapshots/removes native `controls`,
-runs the ancestor walk, calls `FD.attachDrag(video)`, shows Play/Pause +
-Mute, adds an `Escape` keydown listener (added on entry, removed on exit
-through *either* path — a correctness fix over the original design doc's
+`content.js`'s floating fill/exit icon button calls `fillTab.js`'s
+`toggleFill(video, controls)`, where `controls` is `{ fillBtn,
+shadowRoot }`. Entering fill mode: adds the class, snapshots/removes
+native `controls`, runs the ancestor walk, calls `FD.attachDrag(video)`
+and `FD.attachControls(video, controls)` (building `fillControls.js`'s
+bottom bar — play/pause, mute, progress scrubber, standard repeat, A/B
+loop, exit), adds an `Escape` keydown listener (added on entry, removed
+on exit through *either* path — a correctness fix over the original design doc's
 one-shot listener, which could otherwise misfire later), and starts a
 `MutationObserver` on the video's own `class`/`style` attributes that
 re-applies `fd-fill-active` if an external script strips it (observed on
 YouTube). Exiting (by any means — Exit click, Escape, or the video being
 removed from the DOM, via `content.js` calling `FD.forceExitIfActive(video)`
-before cleanup) reverses all of the above — including `FD.detachDrag(video)`
-and clearing `object-position` back to center — and restores every
-neutralized ancestor exactly.
+before cleanup) reverses all of the above — including `FD.detachControls(video)`
+(tearing down the bottom bar and resetting its A/B markers and loop mode),
+`FD.detachDrag(video)`, and clearing `object-position` back to center —
+and restores every neutralized ancestor exactly.
 
 ### Reddit cross-origin embed fill
 
@@ -164,13 +184,24 @@ the same frame:
 
 - **Embed-iframe role** (`redgifs.com`/`imgur.com`/`streamable.com`):
   discovers `<video>` elements in its own document (same Shadow-DOM-aware
-  traversal shape as `content.js`'s `observeRoot`) and attaches its own
-  button row, scoped to its own document (its own shadow-DOM sibling
-  appended to its own `<body>` — never touches the top frame's DOM). Fill/
-  Exit clicks don't touch the video's styles; they `postMessage` the top
-  frame (`{ type: "fd-reddit-fill", action: "enter" | "exit" }`) and
-  optimistically flip the row's own label. Play/Pause and Mute act on the
-  local `<video>` directly. `Escape` inside this frame also sends `exit`.
+  traversal shape as `content.js`'s `observeRoot`) and attaches the same
+  floating fill-icon button `content.js` uses (`data-fd-role="fill"`,
+  `FD.ICONS.fullscreen`, `ResizeObserver`-glued to the video's corner),
+  scoped to its own document (its own shadow-DOM sibling appended to its
+  own `<body>` — never touches the top frame's DOM). Fill clicks don't
+  touch the video's styles; they call `FD.attachControls(video, {
+  shadowRoot, onExit })` — reusing `fillControls.js`'s bottom bar (play/
+  pause, mute, scrub, repeat, A/B loop, exit) for the *local* video, since
+  that module only needs the video element and a shadow root, not
+  `fillTab.js`'s fill-class/ancestor machinery — and `postMessage` the top
+  frame (`{ type: "fd-reddit-fill", action: "enter" | "exit" }`) to fill
+  the `<iframe>` itself. The bar's Exit button is wired to this frame's
+  own `requestExit` via `controls.onExit` (fillControls.js's default,
+  `FD.toggleFill`, is `fillTab.js`'s function and isn't loaded in this
+  frame). `Escape` inside this frame also calls `requestExit`. See
+  `Specs/20260902151129-fill-mode-control-bar/Requirements.md`'s FR13
+  amendment for how this reuse came about after the two specs shipped in
+  sequence.
 - **Top-frame role** (`reddit.com`): listens for `message` events,
   validates `event.origin` against the embed-provider allowlist before
   acting, resolves which `<iframe>` element sent it by recursively
@@ -236,15 +267,25 @@ install layer, then runs `npx playwright test` from `tests/`.
 - Every file is an IIFE attaching only to `window.__fdExt`; never add a
   bare global.
 - `ancestorOverrides.js` before `fillTab.js`, then `drag.js`, then
-  `content.js` in the `<all_urls>` entry's `js` array is load order, not
-  incidental — `fillTab.js` calls `FD.neutralizeAncestors`/
-  `FD.requestExclusiveFill` from `ancestorOverrides.js` and `FD.attachDrag`/
-  `FD.detachDrag` from `drag.js` as soon as fill mode toggles, and
-  `content.js` calls into `window.__fdExt` as soon as it runs. Likewise
-  `ancestorOverrides.js` before `reddit_fill.js` in the Reddit-scoped
-  entry. Any new test fixture that loads `fillTab.js` must also load
-  `ancestorOverrides.js` first, or `enterFill` throws (`FD.neutralizeAncestors`
-  is undefined) the moment Fill is clicked.
+  `fillControls.js`, then `content.js` in the `<all_urls>` entry's `js`
+  array is load order, not incidental — `fillTab.js` calls
+  `FD.neutralizeAncestors`/`FD.requestExclusiveFill` from
+  `ancestorOverrides.js`, `FD.attachDrag`/`FD.detachDrag` from `drag.js`,
+  and `FD.attachControls`/`FD.detachControls`/`FD.ICONS` from
+  `fillControls.js` as soon as fill mode toggles, and `content.js` calls
+  into `window.__fdExt` (including `FD.ICONS` for its own fill-icon
+  button) as soon as it runs. Any new test fixture must load
+  `fillControls.js` before `content.js` for the same reason. Likewise
+  `ancestorOverrides.js`, then `fillControls.js`, then `reddit_fill.js` in
+  the Reddit-scoped entry — `reddit_fill.js`'s embed-iframe role calls
+  `FD.attachControls`/`FD.ICONS` as soon as its local Fill icon is
+  clicked, and that frame never loads the generic `<all_urls>` entry's
+  scripts (it's a genuinely different document, not just a different
+  entry sharing the top frame's world) so `fillControls.js` must be
+  listed in *this* entry too, not assumed present. Any new test fixture
+  that loads `fillTab.js` must also load `ancestorOverrides.js` first, or
+  `enterFill` throws (`FD.neutralizeAncestors` is undefined) the moment
+  Fill is clicked.
 - The extension must never insert, move, wrap, or remove any existing
   host-page DOM node. It may only: set attributes/classes/inline styles on
   the `<video>` (or, for the Reddit embed-iframe mechanism, the `<iframe>`)
@@ -253,8 +294,12 @@ install layer, then runs `npx playwright test` from `tests/`.
   append its own single sibling `overlayHost` to `<body>` — in whichever
   document it's running in, never a different document.
 - Interactive elements the extension adds get a `data-fd-role` attribute
-  (`fill`, `play-pause`, `mute`) rather than relying on button text or DOM
-  order for identification — this is what the test suite targets.
+  (`fill` for the floating icon button; `play-pause`, `mute`, `scrub`,
+  `marker-a`, `marker-b`, `ab-loop`, `clear-loop`, `repeat`, `exit` for
+  `fillControls.js`'s bottom bar) rather than relying on button text or
+  DOM order for identification — this is what the test suite targets.
+  `reddit_fill.js`'s embed frame reuses the same roles via
+  `fillControls.js`, not a parallel naming scheme.
 - Test fixtures under `tests/fixtures/` are built to reproduce the actual
   DOM shape of a real bug (documented in each fixture's own comments),
   not just arbitrary sample markup — keep that pattern for new fixtures.
@@ -317,3 +362,7 @@ files to match, don't just fix the code.
 - [Specs/20260902124537-reddit-iframe-embed-fill/](Specs/20260902124537-reddit-iframe-embed-fill/)
   — the Reddit cross-origin embed iframe fill spec: `Requirements.md`,
   `Plan.md`, `Validation.md`.
+- [Specs/20260902151129-fill-mode-control-bar/](Specs/20260902151129-fill-mode-control-bar/)
+  — the fill-mode control bar spec (play/pause, mute, progress scrubber,
+  standard repeat, A/B loop, exit, hover/idle auto-hide, floating
+  fill-icon button): `Requirements.md`, `Plan.md`, `Validation.md`.

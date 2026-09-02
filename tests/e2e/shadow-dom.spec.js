@@ -16,7 +16,10 @@ test("a video inside an open Shadow DOM gets a Fill button", async ({ page }) =>
   // Playwright's CSS engine pierces open shadow roots by default, matching
   // what a real viewer sees — this mirrors that a person interacting with
   // the page has no trouble reaching into the shadow root either.
-  await expect(page.locator('[data-fd-role="fill"]')).toHaveText("Fill");
+  await expect(page.locator('[data-fd-role="fill"]')).toHaveAttribute(
+    "aria-label",
+    "Fill video"
+  );
 });
 
 test("Fill/Exit works for a Shadow DOM video", async ({ page }) => {
@@ -25,9 +28,12 @@ test("Fill/Exit works for a Shadow DOM video", async ({ page }) => {
 
   await fillBtn.click();
   await expect(video).toHaveClass(/fd-fill-active/);
-  await expect(fillBtn).toHaveText("Exit");
+  // The floating icon hides once filled — the bar's own Exit control
+  // takes over.
+  await expect(fillBtn).toBeHidden();
 
   await page.keyboard.press("Escape");
   await expect(video).not.toHaveClass(/fd-fill-active/);
-  await expect(fillBtn).toHaveText("Fill");
+  await expect(fillBtn).toBeVisible();
+  await expect(fillBtn).toHaveAttribute("aria-label", "Fill video");
 });

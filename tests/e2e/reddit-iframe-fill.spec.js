@@ -25,7 +25,10 @@ function embedFrame(page) {
 }
 
 test("a video inside a cross-origin embed iframe gets a Fill button", async ({ page }) => {
-  await expect(embedFrame(page).locator('[data-fd-role="fill"]')).toHaveText("Fill");
+  await expect(embedFrame(page).locator('[data-fd-role="fill"]')).toHaveAttribute(
+    "aria-label",
+    "Fill video"
+  );
 });
 
 test("Fill fills the <iframe> element itself, not the video inside it", async ({ page }) => {
@@ -36,7 +39,9 @@ test("Fill fills the <iframe> element itself, not the video inside it", async ({
 
   await expect(iframeEl).toHaveClass(/fd-reddit-frame-fill/);
   await expect(embedVideo).not.toHaveClass(/fd-fill-active/);
-  await expect(embedFrame(page).locator('[data-fd-role="fill"]')).toHaveText("Exit");
+  // The bar has its own Exit control once filled, so the floating icon
+  // hides for the duration rather than flipping to an "exit" icon.
+  await expect(embedFrame(page).locator('[data-fd-role="fill"]')).toBeHidden();
 
   const box = await iframeEl.boundingBox();
   const viewport = page.viewportSize();
@@ -53,7 +58,7 @@ test("Escape from within the embed iframe exits the fill", async ({ page }) => {
   await embedFrame(page).locator("body").press("Escape");
 
   await expect(iframeEl).not.toHaveClass(/fd-reddit-frame-fill/);
-  await expect(embedFrame(page).locator('[data-fd-role="fill"]')).toHaveText("Fill");
+  await expect(embedFrame(page).locator('[data-fd-role="fill"]')).toBeVisible();
 });
 
 test("Escape from the top frame exits an active embed-iframe fill", async ({ page }) => {
@@ -66,9 +71,9 @@ test("Escape from the top frame exits an active embed-iframe fill", async ({ pag
   await page.keyboard.press("Escape");
 
   await expect(iframeEl).not.toHaveClass(/fd-reddit-frame-fill/);
-  // The top frame's Escape path notifies the iframe so its own button row
+  // The top frame's Escape path notifies the iframe so its own fill icon
   // resets too (FR9) — not just the iframe element's class.
-  await expect(embedFrame(page).locator('[data-fd-role="fill"]')).toHaveText("Fill");
+  await expect(embedFrame(page).locator('[data-fd-role="fill"]')).toBeVisible();
 });
 
 test("filling the embed iframe neutralizes its own clipping ancestor and restores it on exit", async ({
@@ -99,4 +104,51 @@ test("removing the embedded video while filled exits the top-frame iframe fill",
   await embedFrame(page).locator("#v1").evaluate((video) => video.remove());
 
   await expect(iframeEl).not.toHaveClass(/fd-reddit-frame-fill/);
+});
+
+test("filling the embed iframe attaches the shared control bar (play/pause) to the local video", async ({
+  page,
+}) => {
+  const embed = embedFrame(page);
+  const video = embed.locator("#v1");
+  const playPauseBtn = embed.locator('[data-fd-role="play-pause"]');
+
+  // No decodable source in the fixture — stub paused/play/pause the same
+  // way fill-basic.spec.js does for the generic path.
+  await video.evaluate((el) => {
+    let paused = true;
+    Object.defineProperty(el, "paused", { get: () => paused });
+    el.play = () => {
+      paused = false;
+      el.dispatchEvent(new Event("play"));
+      return Promise.resolve();
+    };
+    el.pause = () => {
+      paused = true;
+      el.dispatchEvent(new Event("pause"));
+    };
+  });
+
+  await expect(playPauseBtn).toBeHidden();
+
+  await embed.locator('[data-fd-role="fill"]').click();
+
+  await expect(playPauseBtn).toBeVisible();
+  await expect(playPauseBtn).toHaveAttribute("aria-label", "Play");
+
+  // The bar is hidden (pointer-events: none) until the pointer moves over
+  // it, per the control-bar spec's FR9.
+  await video.dispatchEvent("mousemove");
+  await playPauseBtn.click();
+  await expect(playPauseBtn).toHaveAttribute("aria-label", "Pause");
+
+  // The bar's own Exit control round-trips through this frame's
+  // requestExit -> postMessage("exit"), not FD.toggleFill (unavailable in
+  // this frame) — confirms controls.onExit was wired correctly.
+  const exitBtn = embed.locator('[data-fd-role="exit"]');
+  await exitBtn.click();
+
+  await expect(page.locator("#embed")).not.toHaveClass(/fd-reddit-frame-fill/);
+  await expect(embed.locator('[data-fd-role="fill"]')).toBeVisible();
+  await expect(playPauseBtn).toBeHidden();
 });

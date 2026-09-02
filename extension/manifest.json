@@ -1,11 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Fill Video",
-  "version": "1.0",
+  "name": "Fit Video to Tab",
+  "version": "1.0.0",
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["ancestorOverrides.js", "fillTab.js", "drag.js", "content.js"],
+      "js": ["ancestorOverrides.js", "fillTab.js", "drag.js", "fillControls.js", "content.js"],
       "run_at": "document_idle"
     },
     {
@@ -15,7 +21,7 @@
         "*://*.imgur.com/*",
         "*://*.streamable.com/*"
       ],
-      "js": ["ancestorOverrides.js", "reddit_fill.js"],
+      "js": ["ancestorOverrides.js", "fillControls.js", "reddit_fill.js"],
       "all_frames": true,
       "run_at": "document_idle"
     },

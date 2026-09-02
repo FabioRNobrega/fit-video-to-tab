@@ -11,6 +11,19 @@
 
 ## Problem Statement
 
+**Amended by `Specs/20260902151129-fill-mode-control-bar/`:** the
+embed-iframe button row this document describes below (FR7, FR10 — a
+text "Fill"/"Exit" button plus Play/Pause/Mute) was superseded once that
+later spec's `fillControls.js` module shipped. `reddit_fill.js`'s embed
+frame now uses the same floating icon-only fill button and shared bottom
+control bar (progress scrub, play/pause, mute, standard repeat, A/B loop,
+exit) as the generic `<all_urls>` path, via `FD.attachControls`/
+`FD.detachControls` — the cross-frame `postMessage` coordination and
+iframe-fill mechanics described in this document are otherwise unchanged.
+Treat every mention of a text "Fill"/"Exit" button or a Play/Pause+Mute-only
+row below as historical; see that spec's Requirements.md FR13 for the
+amendment note on the other side.
+
 `extension/manifest.json`'s single `content_scripts` entry matches
 `<all_urls>` and omits `all_frames`, which defaults to `false` in
 Manifest V3 — so `fillTab.js`, `drag.js`, and `content.js` only ever run
