@@ -326,6 +326,15 @@ install layer, then runs `npx playwright test` from `tests/`.
   `matches` list — a domain added to one without the other either can
   never send a trusted `postMessage` (regex omitted) or loads a script
   that can never actually run there (manifest match omitted).
+- `extension/manifest.json`'s `version` must be bumped whenever a spec
+  under `Specs/` is implemented and lands (i.e. as part of the same change
+  that runs `/init-agent` to fold that spec's effects into this file) —
+  patch (`x.y.Z`) for bug fixes/internal-only changes, minor (`x.Y.0`) for
+  new user-facing capability (a new site supported, new controls), major
+  (`X.0.0`) for a breaking behavior change. Use Semantic Versioning; Chrome
+  Web Store rejects a re-upload whose `version` doesn't strictly increase
+  over the previously published one, so this can't be deferred to
+  "whenever we next publish."
 
 ## Available Commands
 
