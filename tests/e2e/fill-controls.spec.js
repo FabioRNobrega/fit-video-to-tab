@@ -3,9 +3,10 @@ const { test, expect } = require("@playwright/test");
 const path = require("path");
 
 // Regression tests for the fill-mode bottom control bar
-// (extension/fillControls.js): scrubber, play/pause, mute, standard repeat,
-// A/B loop, exit, and the hover/idle auto-hide behavior. See
-// Specs/20260902151129-fill-mode-control-bar/.
+// (extension/fillControls.js): scrubber, play/pause, mute, playback speed,
+// standard repeat, A/B loop, exit, and the hover/idle auto-hide behavior.
+// See Specs/20260902151129-fill-mode-control-bar/ and
+// Specs/20260903123733-playback-speed-control/.
 //
 // The fixture video has no decodable source, so duration/currentTime are
 // stubbed the same way fill-basic.spec.js and drag.spec.js already stub
@@ -240,4 +241,69 @@ test("dragging the scrubber does not move the filled video's object-position (no
 
   const objectPosition = await video.evaluate((el) => el.style.objectPosition);
   expect(objectPosition).toBe("");
+});
+
+test("speed select has the expected presets and starts at 1x", async ({ page }) => {
+  await enterFill(page);
+
+  const speed = page.locator('[data-fd-role="speed"]');
+  const options = await speed.locator("option").evaluateAll((els) =>
+    els.map((el) => ({ value: el.getAttribute("value"), label: el.textContent }))
+  );
+  expect(options).toEqual([
+    { value: "0.25", label: "0.25x" },
+    { value: "0.5", label: "0.5x" },
+    { value: "1", label: "1x" },
+    { value: "1.5", label: "1.5x" },
+    { value: "2", label: "2x" },
+  ]);
+  await expect(speed).toHaveValue("1");
+  expect(await page.locator("#v1").evaluate((el) => el.playbackRate)).toBe(1);
+});
+
+test("selecting a preset sets video.playbackRate", async ({ page }) => {
+  await enterFill(page);
+  await revealBar(page);
+
+  await page.locator('[data-fd-role="speed"]').selectOption("1.5");
+
+  expect(await page.locator("#v1").evaluate((el) => el.playbackRate)).toBe(1.5);
+});
+
+test("external ratechange syncs the speed select", async ({ page }) => {
+  await enterFill(page);
+
+  await page.locator("#v1").evaluate((el) => {
+    el.playbackRate = 2;
+    el.dispatchEvent(new Event("ratechange"));
+  });
+
+  await expect(page.locator('[data-fd-role="speed"]')).toHaveValue("2");
+});
+
+test("re-filling the same video resets playback speed to 1x", async ({ page }) => {
+  const fillBtn = page.locator('[data-fd-role="fill"]');
+  await enterFill(page);
+  await revealBar(page);
+  await page.locator('[data-fd-role="speed"]').selectOption("2");
+
+  await page.keyboard.press("Escape"); // exit — fillBtn is hidden while filled
+  await fillBtn.click(); // re-enter same video
+
+  await expect(page.locator('[data-fd-role="speed"]')).toHaveValue("1");
+  expect(await page.locator("#v1").evaluate((el) => el.playbackRate)).toBe(1);
+});
+
+test("detaching controls removes the ratechange listener without error", async ({ page }) => {
+  await enterFill(page);
+  const video = page.locator("#v1");
+
+  await page.keyboard.press("Escape"); // exit fill — tears down the bar
+
+  await video.evaluate((el) => {
+    el.playbackRate = 2;
+    el.dispatchEvent(new Event("ratechange")); // must not throw once detached
+  });
+
+  await expect(page.locator('[data-fd-role="speed"]')).toHaveCount(0);
 });

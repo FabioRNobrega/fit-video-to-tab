@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Fit Video to Tab",
   "short_name": "Fit Video",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Frame the moment. Instantly expand any video to fill your tab and cut the clutter — on YouTube, Reddit, X, and beyond.",
   "icons": {
     "16": "icon16.png",

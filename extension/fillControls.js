@@ -1,9 +1,10 @@
 // Bottom control bar shown only while a video is in fill mode: progress
-// scrubber, play/pause, mute, standard repeat, A/B loop, exit. A peer module
-// to drag.js — attached/detached symmetrically with fillTab.js's own
-// enter/exit lifecycle (FD.attachControls/FD.detachControls), never running
-// on a video that isn't filled. See
-// Specs/20260902151129-fill-mode-control-bar/. Icons are inline SVG (path
+// scrubber, play/pause, mute, playback speed, standard repeat, A/B loop,
+// exit. A peer module to drag.js — attached/detached symmetrically with
+// fillTab.js's own enter/exit lifecycle (FD.attachControls/FD.detachControls),
+// never running on a video that isn't filled. See
+// Specs/20260902151129-fill-mode-control-bar/ and
+// Specs/20260903123733-playback-speed-control/. Icons are inline SVG (path
 // data from Bootstrap Icons, MIT-licensed) — FD.ICONS is also used by
 // content.js/fillTab.js for the floating fill/exit icon button.
 (function () {
@@ -131,6 +132,22 @@
       "  width: 16px;",
       "  height: 16px;",
       "}",
+      ".fd-speed {",
+      "  height: 28px;",
+      "  background: transparent;",
+      "  border: 1px solid rgba(255, 255, 255, 0.4);",
+      "  color: #fff;",
+      "  cursor: pointer;",
+      "  border-radius: 4px;",
+      "  padding: 0 4px;",
+      "  font: inherit;",
+      "}",
+      ".fd-speed:hover {",
+      "  background: rgba(255, 255, 255, 0.15);",
+      "}",
+      ".fd-speed option {",
+      "  color: #000;",
+      "}",
     ].join("\n");
     shadow.appendChild(style);
     styleInjected = true;
@@ -220,6 +237,10 @@
     elements.mute.textContent = activeVideo.muted ? "🔇" : "🔊";
   }
 
+  function updateSpeedSelect() {
+    elements.speed.value = String(activeVideo.playbackRate);
+  }
+
   function syncDuration() {
     const known = durationKnown();
     elements.scrub.max = known ? activeVideo.duration : 0;
@@ -267,6 +288,13 @@
       '<div class="fd-controls-row">',
       '<button type="button" class="fd-ctrl-btn" data-fd-role="play-pause" aria-label="Play"></button>',
       '<button type="button" class="fd-ctrl-btn" data-fd-role="mute" aria-label="Mute"></button>',
+      '<select class="fd-speed" data-fd-role="speed" aria-label="Playback speed">',
+      '<option value="0.25">0.25x</option>',
+      '<option value="0.5">0.5x</option>',
+      '<option value="1" selected>1x</option>',
+      '<option value="1.5">1.5x</option>',
+      '<option value="2">2x</option>',
+      "</select>",
       '<button type="button" class="fd-ctrl-btn" data-fd-role="repeat" aria-label="Repeat current video"></button>',
       '<button type="button" class="fd-ctrl-btn" data-fd-role="marker-a" aria-label="Set point A" disabled></button>',
       '<button type="button" class="fd-ctrl-btn" data-fd-role="marker-b" aria-label="Set point B" disabled></button>',
@@ -294,6 +322,7 @@
     markerA = null;
     markerB = null;
     isDraggingScrub = false;
+    video.playbackRate = 1;
 
     bar = buildBar(shadow);
     elements = {
@@ -302,6 +331,7 @@
       markerBIndicator: bar.querySelector('[data-fd-role="marker-b-indicator"]'),
       playPause: bar.querySelector('[data-fd-role="play-pause"]'),
       mute: bar.querySelector('[data-fd-role="mute"]'),
+      speed: bar.querySelector('[data-fd-role="speed"]'),
       repeat: bar.querySelector('[data-fd-role="repeat"]'),
       markerA: bar.querySelector('[data-fd-role="marker-a"]'),
       markerB: bar.querySelector('[data-fd-role="marker-b"]'),
@@ -318,18 +348,21 @@
     elements.exit.innerHTML = FD.ICONS.fullscreenExit;
     updatePlayPauseIcon();
     updateMuteIcon();
+    updateSpeedSelect();
     syncDuration();
     refreshLoopButtons();
 
     videoHandlers = {
       onPlayPause: updatePlayPauseIcon,
       onVolume: updateMuteIcon,
+      onRateChange: updateSpeedSelect,
       onTimeUpdate,
       onDuration: syncDuration,
     };
     video.addEventListener("play", videoHandlers.onPlayPause);
     video.addEventListener("pause", videoHandlers.onPlayPause);
     video.addEventListener("volumechange", videoHandlers.onVolume);
+    video.addEventListener("ratechange", videoHandlers.onRateChange);
     video.addEventListener("timeupdate", videoHandlers.onTimeUpdate);
     video.addEventListener("loadedmetadata", videoHandlers.onDuration);
     video.addEventListener("durationchange", videoHandlers.onDuration);
@@ -364,6 +397,9 @@
     elements.mute.addEventListener("click", () => {
       video.muted = !video.muted;
     });
+    elements.speed.addEventListener("change", () => {
+      video.playbackRate = Number(elements.speed.value);
+    });
     elements.repeat.addEventListener("click", toggleRepeat);
     elements.markerA.addEventListener("click", setMarkerA);
     elements.markerB.addEventListener("click", setMarkerB);
@@ -387,6 +423,7 @@
     video.removeEventListener("play", videoHandlers.onPlayPause);
     video.removeEventListener("pause", videoHandlers.onPlayPause);
     video.removeEventListener("volumechange", videoHandlers.onVolume);
+    video.removeEventListener("ratechange", videoHandlers.onRateChange);
     video.removeEventListener("timeupdate", videoHandlers.onTimeUpdate);
     video.removeEventListener("loadedmetadata", videoHandlers.onDuration);
     video.removeEventListener("durationchange", videoHandlers.onDuration);
