@@ -90,13 +90,21 @@ test("control bar (Play/Pause, Mute) is absent until filled, then present", asyn
   await expect(muteBtn).toBeHidden();
 });
 
+test("video is muted by default on entering fill mode", async ({ page }) => {
+  const video = page.locator("#v1");
+  const fillBtn = page.locator('[data-fd-role="fill"]');
+
+  await fillBtn.click();
+  expect(await video.evaluate((el) => el.muted)).toBe(true);
+});
+
 test("Mute button toggles video.muted and updates its label", async ({ page }) => {
   const video = page.locator("#v1");
   const fillBtn = page.locator('[data-fd-role="fill"]');
   const muteBtn = page.locator('[data-fd-role="mute"]');
 
   await fillBtn.click();
-  expect(await video.evaluate((el) => el.muted)).toBe(false);
+  expect(await video.evaluate((el) => el.muted)).toBe(true); // muted by default
 
   // The bar is hidden (pointer-events: none) until the pointer moves over
   // it, per FR9 — reveal it first or the click hit-tests through to the
@@ -104,12 +112,12 @@ test("Mute button toggles video.muted and updates its label", async ({ page }) =
   await video.dispatchEvent("mousemove");
 
   await muteBtn.click();
-  expect(await video.evaluate((el) => el.muted)).toBe(true);
-  await expect(muteBtn).toHaveText("🔇");
-
-  await muteBtn.click();
   expect(await video.evaluate((el) => el.muted)).toBe(false);
   await expect(muteBtn).toHaveText("🔊");
+
+  await muteBtn.click();
+  expect(await video.evaluate((el) => el.muted)).toBe(true);
+  await expect(muteBtn).toHaveText("🔇");
 });
 
 test("Play/Pause button calls video.play()/pause() and its icon follows real play/pause events", async ({

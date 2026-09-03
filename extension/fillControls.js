@@ -323,6 +323,7 @@
     markerB = null;
     isDraggingScrub = false;
     video.playbackRate = 1;
+    video.muted = true;
 
     bar = buildBar(shadow);
     elements = {
