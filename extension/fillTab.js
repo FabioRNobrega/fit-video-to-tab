@@ -19,6 +19,8 @@
   let attrObserver = null;
   let prevHtmlOverflow = null;
   let prevBodyOverflow = null;
+  let prevVideoCssText = null;
+  let activeChrome = null; // [{ el, prevCssText }]
 
   function injectFillStyle() {
     if (styleInjected) return;
@@ -38,6 +40,27 @@
     styleInjected = true;
   }
 
+  // The rule above only reaches videos in the light DOM. A <video> nested
+  // inside an open Shadow DOM (e.g. Reddit's native v.redd.it player, whose
+  // <shreddit-player> renders its <video> in its own shadow root) is a
+  // separate style scope that document.head's stylesheet can never cross —
+  // classList.add("fd-fill-active") alone silently does nothing visible
+  // there. Applying the same declarations as inline !important styles works
+  // regardless of shadow nesting, so this runs unconditionally alongside the
+  // class toggle: redundant (harmless) for ordinary light-DOM sites, load-
+  // bearing for shadow-nested ones. Mirrors the inline-style approach
+  // redditFill.js already uses for its iframe-fill path, for the same
+  // reason.
+  function applyFillOverrides(video) {
+    video.style.setProperty("position", "fixed", "important");
+    video.style.setProperty("inset", "0", "important");
+    video.style.setProperty("width", "100vw", "important");
+    video.style.setProperty("height", "100vh", "important");
+    video.style.setProperty("object-fit", "cover", "important");
+    video.style.setProperty("z-index", "2147483647", "important");
+    video.style.setProperty("background", "#000", "important");
+  }
+
   // Ancestor clipping/stacking-override computation and the
   // fill-exclusivity arbiter live in ancestorOverrides.js, shared with
   // redditFill.js's iframe-element fill path — see
@@ -46,7 +69,9 @@
   function enterFill(video, controls) {
     video.dataset.fdControls = video.hasAttribute("controls") ? "1" : "0";
     video.removeAttribute("controls");
+    prevVideoCssText = video.style.cssText;
     video.classList.add("fd-fill-active");
+    applyFillOverrides(video);
 
     if (FD.requestExclusiveFill) FD.requestExclusiveFill(exitFill);
 
@@ -64,6 +89,20 @@
     activeVideo = video;
     activeControls = controls;
     activeAncestors = FD.neutralizeAncestors(video);
+
+    // Some sites render their own control overlay directly on top of the
+    // video (e.g. Reddit's native player's <shreddit-media-ui>), which
+    // intercepts pointer events meant for drag.js and the video itself.
+    // FD.collectFillChrome is an optional site-specific hook (see
+    // redditNativeFill.js) — hide whatever it returns for the duration.
+    activeChrome = [];
+    if (FD.collectFillChrome) {
+      FD.collectFillChrome(video).forEach((el) => {
+        activeChrome.push({ el, prevCssText: el.style.cssText });
+        el.style.setProperty("display", "none", "important");
+      });
+    }
+
     FD.attachDrag(video);
     FD.attachControls(video, controls);
     // fillControls.js's bottom bar has its own Exit control, so the
@@ -85,6 +124,7 @@
     attrObserver = new MutationObserver(() => {
       if (!video.classList.contains("fd-fill-active")) {
         video.classList.add("fd-fill-active");
+        applyFillOverrides(video);
       }
     });
     attrObserver.observe(video, {
@@ -110,7 +150,11 @@
     FD.detachControls(video);
     FD.detachDrag(video);
     video.classList.remove("fd-fill-active");
-    video.style.objectPosition = ""; // reset drag.js's crop offset back to center
+    // Restores the video's pre-fill inline style wholesale, which also
+    // resets drag.js's crop offset back to center (it was never part of
+    // prevVideoCssText, captured before drag could touch the video).
+    video.style.cssText = prevVideoCssText || "";
+    prevVideoCssText = null;
     if (video.dataset.fdControls === "1") {
       video.setAttribute("controls", "");
     }
@@ -118,6 +162,11 @@
 
     FD.restoreAncestors(activeAncestors);
     activeAncestors = null;
+
+    activeChrome.forEach(({ el, prevCssText }) => {
+      el.style.cssText = prevCssText;
+    });
+    activeChrome = null;
 
     document.documentElement.style.overflow = prevHtmlOverflow;
     if (document.body) document.body.style.overflow = prevBodyOverflow;

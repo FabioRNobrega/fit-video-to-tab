@@ -40,8 +40,17 @@ test("Fill/Exit works for a Shadow DOM video", async ({ page }) => {
   // takes over.
   await expect(fillBtn).toBeHidden();
 
+  // A shadow-nested video can't be reached by the document.head
+  // stylesheet backing the fd-fill-active class (shadow DOM is a separate
+  // style scope) — fillTab.js also applies the same declarations inline,
+  // so assert the actual computed effect, not just the class marker.
+  await expect(video).toHaveCSS("position", "fixed");
+  const viewportWidth = await page.evaluate(() => window.innerWidth);
+  await expect(video).toHaveCSS("width", `${viewportWidth}px`);
+
   await page.keyboard.press("Escape");
   await expect(video).not.toHaveClass(/fd-fill-active/);
+  await expect(video).not.toHaveCSS("position", "fixed");
   await expect(fillBtn).toBeVisible();
   await expect(fillBtn).toHaveAttribute("aria-label", "Fill video");
 });

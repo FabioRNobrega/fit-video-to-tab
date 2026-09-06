@@ -30,7 +30,7 @@
         "*://*.imgur.com/*",
         "*://*.streamable.com/*"
       ],
-      "js": ["ancestorOverrides.js", "fillControls.js", "redditFill.js"],
+      "js": ["ancestorOverrides.js", "fillControls.js", "redditFill.js", "redditNativeFill.js"],
       "all_frames": true,
       "run_at": "document_idle"
     },

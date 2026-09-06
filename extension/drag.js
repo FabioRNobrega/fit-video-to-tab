@@ -35,6 +35,14 @@
     styleInjected = true;
   }
 
+  // Same shadow-DOM scoping gap as fillTab.js's injectFillStyle: this
+  // document.head stylesheet never reaches a <video> nested inside an open
+  // Shadow DOM (e.g. Reddit's native player). Applying the cursor inline
+  // alongside the class toggle covers that case too.
+  function applyCursor(video, value) {
+    video.style.setProperty("cursor", value, "important");
+  }
+
   function currentPositionX(video) {
     const raw = video.style.objectPosition;
     if (!raw) return 50;
@@ -74,6 +82,7 @@
       if (Math.abs(deltaX) < DRAG_THRESHOLD) return;
       session.hasMoved = true;
       video.classList.add("fd-dragging");
+      applyCursor(video, "grabbing");
     }
 
     const scale = Math.max(
@@ -100,6 +109,7 @@
       // Ignore — pointer may already be released (e.g. pointercancel).
     }
     video.classList.remove("fd-dragging");
+    applyCursor(video, "grab");
     session = null;
   }
 
@@ -108,6 +118,7 @@
     if (activeVideo) detachDrag(activeVideo);
 
     injectCursorStyle();
+    applyCursor(video, "grab");
     video.addEventListener("pointerdown", onPointerDown);
     video.addEventListener("pointermove", onPointerMove);
     video.addEventListener("pointerup", endSession);
@@ -125,6 +136,7 @@
     video.removeEventListener("pointercancel", endSession);
     video.removeEventListener("pointerleave", endSession);
     video.classList.remove("fd-dragging");
+    video.style.removeProperty("cursor");
     session = null;
     activeVideo = null;
   }

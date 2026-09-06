@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>reddit-native-player fixture</title>
+</head>
+<body>
+  <!-- Reproduces Reddit's real v.redd.it player shape: <shreddit-player>'s
+       open Shadow DOM holds the real <video> plus a sibling
+       <shreddit-media-ui> overlay, absolutely positioned on top of it with
+       pointer-events re-enabled on its own .controls layer — exactly like
+       Reddit's own click-to-toggle-playback overlay. Without hiding that
+       overlay while filled, drag.js's video-attached pointer listeners
+       never see the press (the overlay's own click handler fires instead),
+       which is the bug redditNativeFill.js's FD.collectFillChrome hook
+       fixes. -->
+  <shreddit-player></shreddit-player>
+
+  <script>
+    window.__nativeToggleCount = 0;
+
+    customElements.define(
+      "shreddit-player",
+      class extends HTMLElement {
+        connectedCallback() {
+          const shadow = this.attachShadow({ mode: "open" });
+
+          const wrapper = document.createElement("div");
+          wrapper.style.cssText = "position: relative; width: 400px; height: 300px;";
+
+          const video = document.createElement("video");
+          video.id = "v1";
+          video.style.cssText = "display: block; width: 100%; height: 100%;";
+
+          const mediaUi = document.createElement("shreddit-media-ui");
+          mediaUi.style.cssText = "position: absolute; inset: 0;";
+          const controls = document.createElement("div");
+          controls.className = "controls";
+          controls.style.cssText = "position: absolute; inset: 0; pointer-events: auto;";
+          controls.addEventListener("click", () => {
+            window.__nativeToggleCount += 1;
+          });
+          mediaUi.appendChild(controls);
+
+          wrapper.appendChild(video);
+          wrapper.appendChild(mediaUi);
+          shadow.appendChild(wrapper);
+        }
+      }
+    );
+  </script>
+
+  <script src="../../extension/ancestorOverrides.js"></script>
+  <script src="../../extension/fillTab.js"></script>
+  <script src="../../extension/drag.js"></script>
+  <script src="../../extension/fillControls.js"></script>
+  <script src="../../extension/content.js"></script>
+  <script src="../../extension/redditNativeFill.js"></script>
+</body>
+</html>
