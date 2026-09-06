@@ -6,7 +6,7 @@
 </head>
 <body>
   <!-- Same shape as reddit-top.html's iframe, but served from an origin
-       that is NOT in reddit_fill.js's embed allowlist
+       that is NOT in redditFill.js's embed allowlist
        (https://embed.example.com, vs. the real redgifs.com/imgur.com/
        streamable.com pattern) — used to verify a postMessage from an
        unlisted origin is ignored (FR5). See
@@ -19,6 +19,6 @@
   ></iframe>
 
   <script src="../../extension/ancestorOverrides.js"></script>
-  <script src="../../extension/reddit_fill.js"></script>
+  <script src="../../extension/redditFill.js"></script>
 </body>
 </html>

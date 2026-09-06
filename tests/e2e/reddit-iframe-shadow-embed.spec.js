@@ -5,7 +5,7 @@ const { serveRepoAtOrigin } = require("./helpers/serveRepoAtOrigin");
 
 // Reproduces the real-Reddit regression: the embed <iframe> lives inside a
 // custom element's open Shadow DOM (Reddit's own player-wrapper component),
-// not as a direct child of <body>. reddit_fill.js's top-frame role must
+// not as a direct child of <body>. redditFill.js's top-frame role must
 // find it there (a plain document.querySelectorAll("iframe") never would)
 // and must be able to walk back OUT of that shadow root to reach the
 // page's own clipping/stacking ancestors further up the light DOM. See

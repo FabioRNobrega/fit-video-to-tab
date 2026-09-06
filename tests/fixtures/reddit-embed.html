@@ -8,7 +8,7 @@
   <!-- Stands in for a RedGIFs (or similar) embed iframe's own document: a
        <video> plus ancestorOverrides.js + fillControls.js (the shared
        fill-mode control bar, reused here for local play/pause/mute/scrub
-       — see Specs/20260902151129-fill-mode-control-bar/) + reddit_fill.js
+       — see Specs/20260902151129-fill-mode-control-bar/) + redditFill.js
        — no fillTab.js/drag.js/content.js, which never load inside a real
        cross-origin embed iframe under this design. See
        Specs/20260902124537-reddit-iframe-embed-fill/. -->
@@ -16,6 +16,6 @@
 
   <script src="../../extension/ancestorOverrides.js"></script>
   <script src="../../extension/fillControls.js"></script>
-  <script src="../../extension/reddit_fill.js"></script>
+  <script src="../../extension/redditFill.js"></script>
 </body>
 </html>

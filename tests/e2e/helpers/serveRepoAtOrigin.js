@@ -3,9 +3,9 @@
 // pattern, e.g. "https://www.redgifs.com/**") by reading the matching file
 // straight off disk at the repo-relative pathname — so a fixture served
 // "from" a real embed-provider hostname can still reference
-// "../../extension/reddit_fill.js" the same way file:// fixtures already
+// "../../extension/redditFill.js" the same way file:// fixtures already
 // do, without any real network access or DNS resolution. Used to give
-// reddit_fill.js's tests a genuinely distinct origin for the embed iframe,
+// redditFill.js's tests a genuinely distinct origin for the embed iframe,
 // so its event.origin check is exercised for real. See
 // Specs/20260902124537-reddit-iframe-embed-fill/.
 const fs = require("fs");

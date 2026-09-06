@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>overlay-occluded-video fixture</title>
+  <style>
+    /* Reproduces the X/Twitter and Instagram regression: both render their
+       own full-size overlay <div> directly on top of the <video> for their
+       own play/pause and ad-detection UI, so a real pointer is always
+       hit-tested to that overlay, never to the <video> element underneath.
+       A hover-reveal implementation that listens for pointerenter/leave on
+       the <video> itself never sees the pointer at all here. */
+    html, body { margin: 0; padding: 0; }
+    .player { position: relative; width: 320px; height: 180px; }
+    .player video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    .player .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="player">
+    <video id="v1" width="320" height="180" controls></video>
+    <div class="overlay"></div>
+  </div>
+
+  <script src="../../extension/ancestorOverrides.js"></script>
+  <script src="../../extension/fillTab.js"></script>
+  <script src="../../extension/drag.js"></script>
+  <script src="../../extension/fillControls.js"></script>
+  <script src="../../extension/content.js"></script>
+</body>
+</html>

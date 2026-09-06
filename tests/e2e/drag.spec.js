@@ -157,6 +157,12 @@ test("exiting fill mode resets the crop to center; re-entering starts centered a
   await page.keyboard.press("Escape");
   expect(await objectPositionX(page)).toBeNull();
 
+  // The synthetic drag pointermove dispatched above (clientY: 100, a fixed
+  // stand-in coordinate, not the video's real position) bubbles to the
+  // extension's own window-level hover tracking same as a real pointermove
+  // would — hover the video for real before re-entering so the button is
+  // actually visible to click, matching genuine pointer input.
+  await page.locator("#v1").hover();
   await fillBtn.click(); // re-enter
   expect(await objectPositionX(page)).toBeNull();
 });

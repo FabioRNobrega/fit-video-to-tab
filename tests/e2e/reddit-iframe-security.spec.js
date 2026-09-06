@@ -4,7 +4,7 @@ const path = require("path");
 const { serveRepoAtOrigin } = require("./helpers/serveRepoAtOrigin");
 
 // A postMessage claiming to be a Fill request must be ignored unless it
-// comes from an origin reddit_fill.js actually trusts (FR5) — otherwise any
+// comes from an origin redditFill.js actually trusts (FR5) — otherwise any
 // unrelated frame on a Reddit page could resize/reposition one of the top
 // frame's own <iframe> elements. See
 // Specs/20260902124537-reddit-iframe-embed-fill/.
@@ -13,7 +13,7 @@ const FIXTURE =
 
 test.beforeEach(async ({ page }) => {
   // Same fixture content as the trusted-origin tests, but served from an
-  // origin NOT in reddit_fill.js's embed allowlist.
+  // origin NOT in redditFill.js's embed allowlist.
   await serveRepoAtOrigin(page, "https://embed.example.com/**");
   await page.goto(FIXTURE);
 });

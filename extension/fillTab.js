@@ -40,7 +40,7 @@
 
   // Ancestor clipping/stacking-override computation and the
   // fill-exclusivity arbiter live in ancestorOverrides.js, shared with
-  // reddit_fill.js's iframe-element fill path — see
+  // redditFill.js's iframe-element fill path — see
   // Specs/20260902124537-reddit-iframe-embed-fill/.
 
   function enterFill(video, controls) {

@@ -11,7 +11,7 @@
        component), itself inside a clipping/stacking-context wrapper
        further up the light DOM. Without shadow-DOM-aware iframe discovery
        AND an ancestor walk that crosses back out of the shadow root,
-       reddit_fill.js's top-frame role could neither find the iframe to
+       redditFill.js's top-frame role could neither find the iframe to
        fill it, nor escape the page's own layout ancestors once found —
        "Fill" would flip the button to "Exit" but visibly do nothing. See
        Specs/20260902124537-reddit-iframe-embed-fill/. -->
@@ -41,6 +41,6 @@
   <script src="../../extension/drag.js"></script>
   <script src="../../extension/fillControls.js"></script>
   <script src="../../extension/content.js"></script>
-  <script src="../../extension/reddit_fill.js"></script>
+  <script src="../../extension/redditFill.js"></script>
 </body>
 </html>

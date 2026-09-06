@@ -408,8 +408,8 @@
     elements.clearLoop.addEventListener("click", clearLoopPoints);
     // The exit action is caller-supplied (controls.onExit) rather than
     // hardcoded to FD.toggleFill, since fillControls.js is also reused by
-    // reddit_fill.js's embed-iframe frame, where FD.toggleFill (fillTab.js)
-    // isn't loaded at all — see extension/reddit_fill.js.
+    // redditFill.js's embed-iframe frame, where FD.toggleFill (fillTab.js)
+    // isn't loaded at all — see extension/redditFill.js.
     elements.exit.addEventListener("click", () => {
       if (controls.onExit) controls.onExit();
     });

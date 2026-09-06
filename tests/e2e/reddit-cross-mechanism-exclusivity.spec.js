@@ -5,7 +5,7 @@ const { serveRepoAtOrigin } = require("./helpers/serveRepoAtOrigin");
 
 // Only one video may be filled at a time tab-wide, whether via the generic
 // path (fillTab.js, for the same-document #native video) or the Reddit
-// iframe path (reddit_fill.js, for the embedded video) — FR8. See
+// iframe path (redditFill.js, for the embedded video) — FR8. See
 // Specs/20260902124537-reddit-iframe-embed-fill/.
 const FIXTURE = "file://" + path.join(__dirname, "..", "fixtures", "reddit-top.html");
 
@@ -51,9 +51,19 @@ test("filling the generic-path video evicts an active embed-iframe fill", async 
 
   // The now-filled iframe covers the whole top-frame viewport (fixed,
   // top z-index), occluding the native video itself for real pointer
-  // input — dispatch the hover event directly, the same kind of
-  // occlusion workaround as the evaluate()-click above.
-  await nativeVideo.dispatchEvent("pointerenter");
+  // input — dispatch a synthetic pointermove at its coordinates instead,
+  // the same kind of occlusion workaround as the evaluate()-click above.
+  // Hover detection is coordinate-based (see content.js's hoverEntries),
+  // so this reaches it the same way a real, unoccluded pointer move would.
+  await page.evaluate(() => {
+    const rect = document.querySelector("#native").getBoundingClientRect();
+    window.dispatchEvent(
+      new PointerEvent("pointermove", {
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      })
+    );
+  });
   await nativeFillBtn.click();
 
   await expect(nativeVideo).toHaveClass(/fd-fill-active/);

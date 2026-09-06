@@ -93,7 +93,7 @@ An automated regression suite (Playwright, real Chromium) lives under `tests/` a
 make test
 ```
 
-It loads `extension/ancestorOverrides.js`, `extension/fillTab.js`, `extension/drag.js`, `extension/fillControls.js`, `extension/content.js`, and (for the Reddit embed case) `extension/reddit_fill.js` directly as plain `<script>` tags against fixture pages under `tests/fixtures/` that reproduce the DOM shapes behind real bugs found while testing on x.com and Reddit (clipping ancestors, a shared multi-video timeline container, a stacking-context-creating layout wrapper, a Shadow-DOM-nested video, a cross-origin embed iframe) — this works because none of these scripts use any `chrome.*` API, so they run identically whether loaded as an extension or as plain page scripts.
+It loads `extension/ancestorOverrides.js`, `extension/fillTab.js`, `extension/drag.js`, `extension/fillControls.js`, `extension/content.js`, and (for the Reddit embed case) `extension/redditFill.js` directly as plain `<script>` tags against fixture pages under `tests/fixtures/` that reproduce the DOM shapes behind real bugs found while testing on x.com and Reddit (clipping ancestors, a shared multi-video timeline container, a stacking-context-creating layout wrapper, a Shadow-DOM-nested video, a cross-origin embed iframe) — this works because none of these scripts use any `chrome.*` API, so they run identically whether loaded as an extension or as plain page scripts.
 
 `make test-build` builds the image without running it; `make test-clean` removes it. Some things are intentionally left to manual verification instead — real extension loading in a browser, and behavior on real third-party sites.
 

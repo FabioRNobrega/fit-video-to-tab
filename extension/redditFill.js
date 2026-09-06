@@ -196,6 +196,47 @@
     const videoState = new WeakMap(); // video -> { fillBtn, resizeObserver, cleanup }
     let filledVideo = null;
 
+    // Hover-reveal is driven by raw pointer coordinates against each
+    // video's live rect, not pointerenter/pointerleave targeted at the
+    // <video> element itself — see content.js's identical hoverEntries for
+    // why (embed providers can render their own overlay on top of the
+    // <video>, same as X/Twitter and Instagram do in the top frame).
+    const hoverEntries = new Set(); // { video, fillBtn, setHovering }
+
+    // Remembered so a video's hover state can be recomputed when its rect
+    // changes without waiting for the next actual pointer movement — see
+    // content.js's identical mechanism.
+    let lastPointerX = null;
+    let lastPointerY = null;
+
+    function isPointInRect(x, y, rect) {
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    }
+
+    function recomputeHover(entry) {
+      if (lastPointerX === null) return;
+      const overVideo = isPointInRect(lastPointerX, lastPointerY, entry.video.getBoundingClientRect());
+      const overButton =
+        !entry.fillBtn.hidden &&
+        isPointInRect(lastPointerX, lastPointerY, entry.fillBtn.getBoundingClientRect());
+      entry.setHovering(overVideo || overButton);
+    }
+
+    function handlePointerMove(e) {
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+      hoverEntries.forEach(recomputeHover);
+    }
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+
+    function handlePointerLeaveWindow(e) {
+      if (e.relatedTarget) return;
+      lastPointerX = null;
+      lastPointerY = null;
+      hoverEntries.forEach((entry) => entry.setHovering(false));
+    }
+    document.addEventListener("mouseout", handlePointerLeaveWindow);
+
     function sendToTop(action) {
       if (window.top) {
         window.top.postMessage({ type: MESSAGE_TYPE, action }, "*");
@@ -256,10 +297,38 @@
       fillBtn.hidden = true;
       shadow.appendChild(fillBtn);
 
+      // Same hover-reveal pattern as content.js's attachFillButton — this
+      // frame never loads content.js (it's a genuinely separate document),
+      // so the button lifecycle is duplicated rather than shared.
+      let isHovering = false;
+      let isFilled = false;
+
+      function syncVisibility() {
+        fillBtn.hidden = isFilled || !isHovering;
+      }
+
+      function setFilled(filled) {
+        isFilled = filled;
+        // The video's own rect may have just changed synchronously —
+        // recompute immediately rather than waiting for the
+        // ResizeObserver's async callback (see content.js's setFilled).
+        recomputeHover(hoverEntry);
+        syncVisibility();
+      }
+
+      function setHovering(hovering) {
+        isHovering = hovering;
+        syncVisibility();
+      }
+
+      const hoverEntry = { video, fillBtn, setHovering };
+      hoverEntries.add(hoverEntry);
+
       function syncPosition() {
         const rect = video.getBoundingClientRect();
         fillBtn.style.left = `${rect.left + ICON_INSET}px`;
         fillBtn.style.top = `${rect.top + ICON_INSET}px`;
+        recomputeHover(hoverEntry);
       }
 
       const resizeObserver = new ResizeObserver(syncPosition);
@@ -267,44 +336,6 @@
       window.addEventListener("scroll", syncPosition, true);
       window.addEventListener("resize", syncPosition);
       syncPosition();
-
-      // Same hover-reveal pattern as content.js's attachFillButton — this
-      // frame never loads content.js (it's a genuinely separate document),
-      // so the button lifecycle is duplicated rather than shared.
-      let isHoveringVideo = false;
-      let isHoveringButton = false;
-      let isFilled = false;
-
-      function syncVisibility() {
-        fillBtn.hidden = isFilled || !(isHoveringVideo || isHoveringButton);
-      }
-
-      function setFilled(filled) {
-        isFilled = filled;
-        syncVisibility();
-      }
-
-      function handleVideoEnter() {
-        isHoveringVideo = true;
-        syncVisibility();
-      }
-      function handleVideoLeave() {
-        isHoveringVideo = false;
-        syncVisibility();
-      }
-      function handleButtonEnter() {
-        isHoveringButton = true;
-        syncVisibility();
-      }
-      function handleButtonLeave() {
-        isHoveringButton = false;
-        syncVisibility();
-      }
-
-      video.addEventListener("pointerenter", handleVideoEnter);
-      video.addEventListener("pointerleave", handleVideoLeave);
-      fillBtn.addEventListener("pointerenter", handleButtonEnter);
-      fillBtn.addEventListener("pointerleave", handleButtonLeave);
 
       const entry = {
         fillBtn,
@@ -315,10 +346,7 @@
           resizeObserver.disconnect();
           window.removeEventListener("scroll", syncPosition, true);
           window.removeEventListener("resize", syncPosition);
-          video.removeEventListener("pointerenter", handleVideoEnter);
-          video.removeEventListener("pointerleave", handleVideoLeave);
-          fillBtn.removeEventListener("pointerenter", handleButtonEnter);
-          fillBtn.removeEventListener("pointerleave", handleButtonLeave);
+          hoverEntries.delete(hoverEntry);
           fillBtn.remove();
           videoState.delete(video);
         },

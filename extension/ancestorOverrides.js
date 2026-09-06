@@ -1,6 +1,6 @@
 // Shared ancestor clipping/stacking-override walk, plus a small
 // cross-module fill-exclusivity arbiter. Extracted out of fillTab.js so
-// both fillTab.js (walking up from a <video>) and reddit_fill.js (walking
+// both fillTab.js (walking up from a <video>) and redditFill.js (walking
 // up from an <iframe> element hosting a cross-origin embedded video) share
 // one implementation instead of two copies. Loaded before both callers in
 // extension/manifest.json's two content_scripts entries. See
@@ -119,7 +119,7 @@
   }
 
   // Lets two independent fill mechanisms (fillTab.js's generic path,
-  // reddit_fill.js's iframe-fill path) share the "only one video fills at
+  // redditFill.js's iframe-fill path) share the "only one video fills at
   // a time" guarantee tab-wide. Each caller passes its own exit function
   // before applying its own fill; if another mechanism's fill is already
   // active, that one is evicted first. Exit functions are expected to be

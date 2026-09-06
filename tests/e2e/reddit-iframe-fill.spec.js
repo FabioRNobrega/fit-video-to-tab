@@ -7,14 +7,14 @@ const { serveRepoAtOrigin } = require("./helpers/serveRepoAtOrigin");
 // inside a cross-origin iframe (RedGIFs primarily) is invisible to the
 // generic content_scripts entry (all_frames defaults to false), and even
 // with visibility, position:fixed inside that iframe can't reach the real
-// tab viewport — so reddit_fill.js fills the <iframe> element itself
+// tab viewport — so redditFill.js fills the <iframe> element itself
 // instead, coordinated across the frame boundary via postMessage. See
 // Specs/20260902124537-reddit-iframe-embed-fill/.
 const FIXTURE = "file://" + path.join(__dirname, "..", "fixtures", "reddit-top.html");
 
 test.beforeEach(async ({ page }) => {
   // The iframe's src is served "from" https://www.redgifs.com so
-  // reddit_fill.js's real event.origin check is exercised, not bypassed by
+  // redditFill.js's real event.origin check is exercised, not bypassed by
   // file:// same-origin defaults.
   await serveRepoAtOrigin(page, "https://www.redgifs.com/**");
   await page.goto(FIXTURE);
