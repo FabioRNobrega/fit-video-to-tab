@@ -1,0 +1,115 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>redgif-embed fixture</title>
+  <style>
+    html,
+    body {
+      margin: 18px;
+      background: #333;
+    }
+
+    .Player,
+    .embeddedPlayer {
+      position: relative;
+      width: 240px;
+      height: 260px;
+      padding: 18px;
+      border: 6px solid #c00;
+      overflow: hidden;
+      background: #111;
+    }
+
+    .Player-Video,
+    .videoLink {
+      position: relative;
+      display: block;
+      width: 200px;
+      height: 220px;
+      padding: 12px;
+      border: 4px solid #0c0;
+      background: #222;
+    }
+
+    video {
+      display: block;
+      width: 160px;
+      height: 180px;
+      background: #666;
+    }
+
+    .Player-Poster,
+    .Player-OverLayer,
+    .RedGifsControls,
+    .RedGifsUser,
+    .backdropWrap,
+    .logo,
+    .playerBottom,
+    .sidebar {
+      position: absolute;
+      z-index: 20;
+      background: rgba(255, 0, 0, 0.75);
+      color: #fff;
+    }
+
+    .Player-Poster {
+      inset: 40px;
+      pointer-events: none;
+    }
+
+    .Player-OverLayer {
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .RedGifsControls {
+      right: 8px;
+      bottom: 8px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .RedGifsUser {
+      left: 8px;
+      bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Reproduces the observed RedGIFs player DOM from a Reddit embed:
+       provider player wrappers, poster/overlay layers, user metadata, and
+       provider controls all surround the real video. The extension should
+       fill the actual <video> inside the already-expanded iframe and hide
+       this provider chrome while filled. See
+       Specs/20260906160538-redgif-direct-video-fill/. -->
+  <div class="Player" data-original="player">
+    <a
+      class="videoLink"
+      href="/watch/frizzydarkgrayivorybilledwoodpecker"
+      target="_blank"
+      rel="noreferrer"
+      data-original="video-link"
+    >
+      <video id="v1" muted playsinline preload="metadata"></video>
+    </a>
+    <img class="Player-Poster" alt="Poster" />
+    <div class="Player-OverLayer"></div>
+    <div class="RedGifsUser">
+      <img class="Avatar" alt="" />
+      <span class="Username">Carie</span>
+    </div>
+    <div class="RedGifsControls">
+      <button class="Share" type="button" aria-label="Share">Share</button>
+      <button class="Quality" type="button" aria-label="Quality">SD</button>
+      <button class="Fullscreen" type="button" aria-label="Fullscreen">Full</button>
+    </div>
+  </div>
+
+  <script src="../../extension/ancestorOverrides.js"></script>
+  <script src="../../extension/drag.js"></script>
+  <script src="../../extension/fillControls.js"></script>
+  <script src="../../extension/redGifFill.js"></script>
+  <script src="../../extension/redditFill.js"></script>
+</body>
+</html>

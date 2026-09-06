@@ -243,16 +243,32 @@
       }
     }
 
+    function redGifHandler() {
+      return FD.redGifFill && typeof FD.redGifFill.enter === "function"
+        ? FD.redGifFill
+        : null;
+    }
+
     function requestEnter(video, entry) {
       if (filledVideo && filledVideo !== video) {
         const prevEntry = videoState.get(filledVideo);
         if (prevEntry) {
-          FD.detachControls(filledVideo);
+          if (prevEntry.providerHandled && redGifHandler()) {
+            redGifHandler().exit(filledVideo);
+          } else {
+            FD.detachControls(filledVideo);
+          }
           prevEntry.setFilled(false);
+          prevEntry.providerHandled = false;
         }
       }
       filledVideo = video;
-      FD.attachControls(video, { shadowRoot: shadow, onExit: () => requestExit(video, entry) });
+      const handler = redGifHandler();
+      entry.providerHandled =
+        !!handler && handler.enter(video, shadow, () => requestExit(video, entry));
+      if (!entry.providerHandled) {
+        FD.attachControls(video, { shadowRoot: shadow, onExit: () => requestExit(video, entry) });
+      }
       entry.setFilled(true);
       sendToTop("enter");
     }
@@ -260,7 +276,12 @@
     function requestExit(video, entry) {
       if (filledVideo !== video) return;
       filledVideo = null;
-      FD.detachControls(video);
+      if (entry.providerHandled && redGifHandler()) {
+        redGifHandler().exit(video);
+      } else {
+        FD.detachControls(video);
+      }
+      entry.providerHandled = false;
       entry.setFilled(false);
       sendToTop("exit");
     }
@@ -273,8 +294,15 @@
       if (!data || data.type !== MESSAGE_TYPE) return;
       if (data.action === "exited" && filledVideo) {
         const entry = videoState.get(filledVideo);
-        FD.detachControls(filledVideo);
-        if (entry) entry.setFilled(false);
+        if (entry && entry.providerHandled && redGifHandler()) {
+          redGifHandler().exit(filledVideo);
+        } else {
+          FD.detachControls(filledVideo);
+        }
+        if (entry) {
+          entry.providerHandled = false;
+          entry.setFilled(false);
+        }
         filledVideo = null;
       }
     });

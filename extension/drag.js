@@ -21,7 +21,13 @@
       ".fd-fill-active {",
       "  cursor: grab;",
       "}",
+      ".fd-redgif-video-fill {",
+      "  cursor: grab;",
+      "}",
       ".fd-fill-active.fd-dragging {",
+      "  cursor: grabbing;",
+      "}",
+      ".fd-redgif-video-fill.fd-dragging {",
       "  cursor: grabbing;",
       "}",
     ].join("\n");
