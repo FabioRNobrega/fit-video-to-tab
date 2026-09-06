@@ -24,6 +24,10 @@
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M11.854 3.646a.5.5 0 0 1 0 .708L8.207 8l3.647 3.646a.5.5 0 0 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 0 1 .708 0M4.5 1a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 1 0v-13a.5.5 0 0 0-.5-.5"/></svg>',
     markerB:
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M4.146 3.646a.5.5 0 0 0 0 .708L7.793 8l-3.647 3.646a.5.5 0 0 0 .708.708l4-4a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708 0M11.5 1a.5.5 0 0 1 .5.5v13a.5.5 0 0 1-1 0v-13a.5.5 0 0 1 .5-.5"/></svg>',
+    skipBack:
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.354 1.646a.5.5 0 0 1 0 .708L2.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/><path fill-rule="evenodd" d="M12.354 1.646a.5.5 0 0 1 0 .708L6.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/></svg>',
+    skipForward:
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M7.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L13.293 8 7.646 2.354a.5.5 0 0 1 0-.708"/><path fill-rule="evenodd" d="M3.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L9.293 8 3.646 2.354a.5.5 0 0 1 0-.708"/></svg>',
     abLoop:
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M5.68 5.792 7.345 7.75 5.681 9.708a2.75 2.75 0 1 1 0-3.916ZM8 6.978 6.416 5.113l-.014-.015a3.75 3.75 0 1 0 0 5.304l.014-.015L8 8.522l1.584 1.865.014.015a3.75 3.75 0 1 0 0-5.304l-.014.015zm.656.772 1.663-1.958a2.75 2.75 0 1 1 0 3.916z"/></svg>',
     clear:
@@ -35,6 +39,7 @@
   let styleInjected = false;
   let activeVideo = null;
   let bar = null;
+  let rail = null;
   let elements = null;
   let loopMode = "none"; // "none" | "repeat" | "ab"
   let markerA = null;
@@ -42,6 +47,7 @@
   let isDraggingScrub = false;
   let hideTimer = null;
   let videoHandlers = null; // { onPlayPause, onTimeUpdate, onDuration, onVolume }
+  let controlHandlers = null;
 
   function injectStyle(shadow) {
     if (styleInjected) return;
@@ -148,6 +154,43 @@
       ".fd-speed option {",
       "  color: #000;",
       "}",
+      ".fd-saturation-rail {",
+      "  position: fixed;",
+      "  top: 50%;",
+      "  right: 12px;",
+      "  z-index: 2147483647;",
+      "  display: flex;",
+      "  flex-direction: column;",
+      "  align-items: center;",
+      "  gap: 8px;",
+      "  width: 38px;",
+      "  height: 180px;",
+      "  padding: 10px 6px;",
+      "  background: rgba(0, 0, 0, 0.72);",
+      "  border: 1px solid rgba(255, 255, 255, 0.18);",
+      "  border-radius: 6px;",
+      "  color: #fff;",
+      "  font: 11px sans-serif;",
+      "  opacity: 0;",
+      "  pointer-events: none;",
+      "  transform: translateY(-50%);",
+      "  transition: opacity 0.2s ease;",
+      "  box-sizing: border-box;",
+      "}",
+      ".fd-saturation-rail.is-visible {",
+      "  opacity: 1;",
+      "  pointer-events: auto;",
+      "}",
+      ".fd-saturation-range {",
+      "  width: 140px;",
+      "  margin: 58px 0;",
+      "  accent-color: #fff;",
+      "  transform: rotate(-90deg);",
+      "}",
+      ".fd-saturation-value {",
+      "  line-height: 1;",
+      "  white-space: nowrap;",
+      "}",
     ].join("\n");
     shadow.appendChild(style);
     styleInjected = true;
@@ -165,6 +208,8 @@
     const known = durationKnown();
     elements.markerA.disabled = !known;
     elements.markerB.disabled = !known;
+    elements.skipBack.disabled = !known;
+    elements.skipForward.disabled = !known;
   }
 
   function refreshLoopButtons() {
@@ -258,10 +303,12 @@
 
   function showBar() {
     bar.classList.add("is-visible");
+    if (rail) rail.classList.add("is-visible");
   }
 
   function hideBar() {
     bar.classList.remove("is-visible");
+    if (rail) rail.classList.remove("is-visible");
   }
 
   function scheduleHide() {
@@ -291,10 +338,18 @@
       '<select class="fd-speed" data-fd-role="speed" aria-label="Playback speed">',
       '<option value="0.25">0.25x</option>',
       '<option value="0.5">0.5x</option>',
+      '<option value="0.7">0.7x</option>',
+      '<option value="0.8">0.8x</option>',
+      '<option value="0.9">0.9x</option>',
       '<option value="1" selected>1x</option>',
+      '<option value="1.1">1.1x</option>',
+      '<option value="1.2">1.2x</option>',
+      '<option value="1.3">1.3x</option>',
       '<option value="1.5">1.5x</option>',
       '<option value="2">2x</option>',
       "</select>",
+      '<button type="button" class="fd-ctrl-btn" data-fd-role="skip-back" aria-label="Back 10 seconds" disabled></button>',
+      '<button type="button" class="fd-ctrl-btn" data-fd-role="skip-forward" aria-label="Forward 10 seconds" disabled></button>',
       '<button type="button" class="fd-ctrl-btn" data-fd-role="repeat" aria-label="Repeat current video"></button>',
       '<button type="button" class="fd-ctrl-btn" data-fd-role="marker-a" aria-label="Set point A" disabled></button>',
       '<button type="button" class="fd-ctrl-btn" data-fd-role="marker-b" aria-label="Set point B" disabled></button>',
@@ -303,6 +358,18 @@
       '<span class="fd-spacer"></span>',
       '<button type="button" class="fd-ctrl-btn" data-fd-role="exit" aria-label="Exit fill mode"></button>',
       "</div>",
+    ].join("");
+    shadow.appendChild(el);
+    return el;
+  }
+
+  function buildSaturationRail(shadow) {
+    const el = document.createElement("div");
+    el.className = "fd-saturation-rail";
+    el.setAttribute("data-fd-role", "saturation-rail");
+    el.innerHTML = [
+      '<input type="range" class="fd-saturation-range" data-fd-role="saturation" min="0" max="300" step="1" value="100" aria-label="Saturation" />',
+      '<span class="fd-saturation-value" data-fd-role="saturation-value">100%</span>',
     ].join("");
     shadow.appendChild(el);
     return el;
@@ -323,9 +390,11 @@
     markerB = null;
     isDraggingScrub = false;
     video.playbackRate = 1;
+    video.style.filter = "saturate(100%)";
     video.muted = true;
 
     bar = buildBar(shadow);
+    rail = buildSaturationRail(shadow);
     elements = {
       scrub: bar.querySelector('[data-fd-role="scrub"]'),
       markerAIndicator: bar.querySelector('[data-fd-role="marker-a-indicator"]'),
@@ -333,15 +402,21 @@
       playPause: bar.querySelector('[data-fd-role="play-pause"]'),
       mute: bar.querySelector('[data-fd-role="mute"]'),
       speed: bar.querySelector('[data-fd-role="speed"]'),
+      skipBack: bar.querySelector('[data-fd-role="skip-back"]'),
+      skipForward: bar.querySelector('[data-fd-role="skip-forward"]'),
       repeat: bar.querySelector('[data-fd-role="repeat"]'),
       markerA: bar.querySelector('[data-fd-role="marker-a"]'),
       markerB: bar.querySelector('[data-fd-role="marker-b"]'),
       abLoop: bar.querySelector('[data-fd-role="ab-loop"]'),
       clearLoop: bar.querySelector('[data-fd-role="clear-loop"]'),
       exit: bar.querySelector('[data-fd-role="exit"]'),
+      saturation: rail.querySelector('[data-fd-role="saturation"]'),
+      saturationValue: rail.querySelector('[data-fd-role="saturation-value"]'),
     };
 
     elements.repeat.innerHTML = FD.ICONS.repeat;
+    elements.skipBack.innerHTML = FD.ICONS.skipBack;
+    elements.skipForward.innerHTML = FD.ICONS.skipForward;
     elements.markerA.innerHTML = FD.ICONS.markerA;
     elements.markerB.innerHTML = FD.ICONS.markerB;
     elements.abLoop.innerHTML = FD.ICONS.abLoop;
@@ -350,6 +425,8 @@
     updatePlayPauseIcon();
     updateMuteIcon();
     updateSpeedSelect();
+    elements.saturation.value = "100";
+    elements.saturationValue.textContent = "100%";
     syncDuration();
     refreshLoopButtons();
 
@@ -374,45 +451,73 @@
     bar.addEventListener("mousemove", onActivity);
     bar.addEventListener("pointerenter", onActivity);
     bar.addEventListener("pointerleave", scheduleHide);
+    rail.addEventListener("pointermove", onActivity);
+    rail.addEventListener("mousemove", onActivity);
+    rail.addEventListener("pointerenter", onActivity);
+    rail.addEventListener("pointerleave", scheduleHide);
 
-    elements.scrub.addEventListener("pointerdown", () => {
-      isDraggingScrub = true;
-      clearTimeout(hideTimer);
-      showBar();
-    });
-    elements.scrub.addEventListener("input", () => {
-      video.currentTime = Number(elements.scrub.value);
-    });
-    const endScrubDrag = () => {
-      if (!isDraggingScrub) return;
-      isDraggingScrub = false;
-      scheduleHide();
+    controlHandlers = {
+      onScrubPointerDown: () => {
+        isDraggingScrub = true;
+        clearTimeout(hideTimer);
+        showBar();
+      },
+      onScrubInput: () => {
+        video.currentTime = Number(elements.scrub.value);
+      },
+      onScrubEnd: () => {
+        if (!isDraggingScrub) return;
+        isDraggingScrub = false;
+        scheduleHide();
+      },
+      onPlayPauseClick: () => {
+        if (video.paused) video.play();
+        else video.pause();
+      },
+      onMuteClick: () => {
+        video.muted = !video.muted;
+      },
+      onSpeedChange: () => {
+        video.playbackRate = Number(elements.speed.value);
+      },
+      onSkipBackClick: () => {
+        video.currentTime = Math.max(0, video.currentTime - 10);
+      },
+      onSkipForwardClick: () => {
+        video.currentTime = durationKnown()
+          ? Math.min(video.duration, video.currentTime + 10)
+          : video.currentTime + 10;
+      },
+      onSaturationInput: () => {
+        const value = elements.saturation.value;
+        video.style.filter = "saturate(" + value + "%)";
+        elements.saturationValue.textContent = value + "%";
+      },
+      onExitClick: () => {
+        if (controls.onExit) controls.onExit();
+      },
     };
-    elements.scrub.addEventListener("pointerup", endScrubDrag);
-    elements.scrub.addEventListener("pointercancel", endScrubDrag);
 
-    elements.playPause.addEventListener("click", () => {
-      if (video.paused) video.play();
-      else video.pause();
-    });
-    elements.mute.addEventListener("click", () => {
-      video.muted = !video.muted;
-    });
-    elements.speed.addEventListener("change", () => {
-      video.playbackRate = Number(elements.speed.value);
-    });
+    elements.scrub.addEventListener("pointerdown", controlHandlers.onScrubPointerDown);
+    elements.scrub.addEventListener("input", controlHandlers.onScrubInput);
+    elements.scrub.addEventListener("pointerup", controlHandlers.onScrubEnd);
+    elements.scrub.addEventListener("pointercancel", controlHandlers.onScrubEnd);
+    elements.playPause.addEventListener("click", controlHandlers.onPlayPauseClick);
+    elements.mute.addEventListener("click", controlHandlers.onMuteClick);
+    elements.speed.addEventListener("change", controlHandlers.onSpeedChange);
+    elements.skipBack.addEventListener("click", controlHandlers.onSkipBackClick);
+    elements.skipForward.addEventListener("click", controlHandlers.onSkipForwardClick);
     elements.repeat.addEventListener("click", toggleRepeat);
     elements.markerA.addEventListener("click", setMarkerA);
     elements.markerB.addEventListener("click", setMarkerB);
     elements.abLoop.addEventListener("click", toggleAbLoop);
     elements.clearLoop.addEventListener("click", clearLoopPoints);
+    elements.saturation.addEventListener("input", controlHandlers.onSaturationInput);
     // The exit action is caller-supplied (controls.onExit) rather than
     // hardcoded to FD.toggleFill, since fillControls.js is also reused by
     // redditFill.js's embed-iframe frame, where FD.toggleFill (fillTab.js)
     // isn't loaded at all — see extension/redditFill.js.
-    elements.exit.addEventListener("click", () => {
-      if (controls.onExit) controls.onExit();
-    });
+    elements.exit.addEventListener("click", controlHandlers.onExitClick);
   }
 
   function detachControls(video) {
@@ -431,12 +536,41 @@
     video.removeEventListener("pointermove", onActivity);
     video.removeEventListener("mousemove", onActivity);
 
+    bar.removeEventListener("pointermove", onActivity);
+    bar.removeEventListener("mousemove", onActivity);
+    bar.removeEventListener("pointerenter", onActivity);
+    bar.removeEventListener("pointerleave", scheduleHide);
+    rail.removeEventListener("pointermove", onActivity);
+    rail.removeEventListener("mousemove", onActivity);
+    rail.removeEventListener("pointerenter", onActivity);
+    rail.removeEventListener("pointerleave", scheduleHide);
+    elements.scrub.removeEventListener("pointerdown", controlHandlers.onScrubPointerDown);
+    elements.scrub.removeEventListener("input", controlHandlers.onScrubInput);
+    elements.scrub.removeEventListener("pointerup", controlHandlers.onScrubEnd);
+    elements.scrub.removeEventListener("pointercancel", controlHandlers.onScrubEnd);
+    elements.playPause.removeEventListener("click", controlHandlers.onPlayPauseClick);
+    elements.mute.removeEventListener("click", controlHandlers.onMuteClick);
+    elements.speed.removeEventListener("change", controlHandlers.onSpeedChange);
+    elements.skipBack.removeEventListener("click", controlHandlers.onSkipBackClick);
+    elements.skipForward.removeEventListener("click", controlHandlers.onSkipForwardClick);
+    elements.repeat.removeEventListener("click", toggleRepeat);
+    elements.markerA.removeEventListener("click", setMarkerA);
+    elements.markerB.removeEventListener("click", setMarkerB);
+    elements.abLoop.removeEventListener("click", toggleAbLoop);
+    elements.clearLoop.removeEventListener("click", clearLoopPoints);
+    elements.saturation.removeEventListener("input", controlHandlers.onSaturationInput);
+    elements.exit.removeEventListener("click", controlHandlers.onExitClick);
+
     video.loop = false;
+    video.style.filter = "";
 
     bar.remove();
     bar = null;
+    rail.remove();
+    rail = null;
     elements = null;
     videoHandlers = null;
+    controlHandlers = null;
     activeVideo = null;
     loopMode = "none";
     markerA = null;

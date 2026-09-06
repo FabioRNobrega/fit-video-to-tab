@@ -77,11 +77,41 @@ test("Set point A / Set point B are disabled until duration is known", async ({ 
 
   await expect(page.locator('[data-fd-role="marker-a"]')).toBeDisabled();
   await expect(page.locator('[data-fd-role="marker-b"]')).toBeDisabled();
+  await expect(page.locator('[data-fd-role="skip-back"]')).toBeDisabled();
+  await expect(page.locator('[data-fd-role="skip-forward"]')).toBeDisabled();
 
   await stubMedia(page, 60);
 
   await expect(page.locator('[data-fd-role="marker-a"]')).toBeEnabled();
   await expect(page.locator('[data-fd-role="marker-b"]')).toBeEnabled();
+  await expect(page.locator('[data-fd-role="skip-back"]')).toBeEnabled();
+  await expect(page.locator('[data-fd-role="skip-forward"]')).toBeEnabled();
+});
+
+test("skip buttons seek by 10 seconds and clamp to the known range", async ({ page }) => {
+  await enterFill(page);
+  await stubMedia(page, 60);
+  await revealBar(page);
+
+  const video = page.locator("#v1");
+  const skipBack = page.locator('[data-fd-role="skip-back"]');
+  const skipForward = page.locator('[data-fd-role="skip-forward"]');
+
+  await video.evaluate((el) => (el.currentTime = 25));
+  await skipBack.click();
+  expect(await video.evaluate((el) => el.currentTime)).toBe(15);
+
+  await video.evaluate((el) => (el.currentTime = 5));
+  await skipBack.click();
+  expect(await video.evaluate((el) => el.currentTime)).toBe(0);
+
+  await video.evaluate((el) => (el.currentTime = 40));
+  await skipForward.click();
+  expect(await video.evaluate((el) => el.currentTime)).toBe(50);
+
+  await video.evaluate((el) => (el.currentTime = 55));
+  await skipForward.click();
+  expect(await video.evaluate((el) => el.currentTime)).toBe(60);
 });
 
 test("A-B loop enables only once both markers are set with A < B, and clear resets it", async ({
@@ -199,13 +229,17 @@ test("control bar fades in on movement and fades out after idling", async ({ pag
   await enterFill(page);
 
   const bar = page.locator(".fd-controls");
+  const rail = page.locator('[data-fd-role="saturation-rail"]');
   await expect(bar).not.toHaveClass(/is-visible/);
+  await expect(rail).not.toHaveClass(/is-visible/);
 
   await page.locator("#v1").dispatchEvent("mousemove");
   await expect(bar).toHaveClass(/is-visible/);
+  await expect(rail).toHaveClass(/is-visible/);
 
   await page.clock.fastForward(2500);
   await expect(bar).not.toHaveClass(/is-visible/);
+  await expect(rail).not.toHaveClass(/is-visible/);
 });
 
 test("control bar stays visible through an active scrubber drag, even past the idle delay", async ({
@@ -255,12 +289,92 @@ test("speed select has the expected presets and starts at 1x", async ({ page }) 
   expect(options).toEqual([
     { value: "0.25", label: "0.25x" },
     { value: "0.5", label: "0.5x" },
+    { value: "0.7", label: "0.7x" },
+    { value: "0.8", label: "0.8x" },
+    { value: "0.9", label: "0.9x" },
     { value: "1", label: "1x" },
+    { value: "1.1", label: "1.1x" },
+    { value: "1.2", label: "1.2x" },
+    { value: "1.3", label: "1.3x" },
     { value: "1.5", label: "1.5x" },
     { value: "2", label: "2x" },
   ]);
   await expect(speed).toHaveValue("1");
+  expect(
+    await page.locator(".fd-controls-row > [data-fd-role]").evaluateAll((els) =>
+      els.map((el) => ({
+        role: el.getAttribute("data-fd-role"),
+        label: el.getAttribute("aria-label"),
+      }))
+    )
+  ).toEqual([
+    { role: "play-pause", label: "Play" },
+    { role: "mute", label: "Mute" },
+    { role: "speed", label: "Playback speed" },
+    { role: "skip-back", label: "Back 10 seconds" },
+    { role: "skip-forward", label: "Forward 10 seconds" },
+    { role: "repeat", label: "Repeat current video" },
+    { role: "marker-a", label: "Set point A" },
+    { role: "marker-b", label: "Set point B" },
+    { role: "ab-loop", label: "Loop between A and B" },
+    { role: "clear-loop", label: "Clear loop points" },
+    { role: "exit", label: "Exit fill mode" },
+  ]);
   expect(await page.locator("#v1").evaluate((el) => el.playbackRate)).toBe(1);
+});
+
+test("saturation rail starts at 100 percent and updates the video filter live", async ({
+  page,
+}) => {
+  await enterFill(page);
+
+  const saturation = page.locator('[data-fd-role="saturation"]');
+  const value = page.locator('[data-fd-role="saturation-value"]');
+  const video = page.locator("#v1");
+
+  await expect(page.locator('[data-fd-role="saturation-rail"]')).toHaveCount(1);
+  await expect(saturation).toHaveAttribute("type", "range");
+  await expect(saturation).toHaveAttribute("min", "0");
+  await expect(saturation).toHaveAttribute("max", "300");
+  await expect(saturation).toHaveValue("100");
+  await expect(value).toHaveText("100%");
+  expect(await video.evaluate((el) => el.style.filter)).toBe("saturate(100%)");
+
+  await saturation.evaluate((el) => {
+    el.value = "150";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  await expect(value).toHaveText("150%");
+  expect(await video.evaluate((el) => el.style.filter)).toBe("saturate(150%)");
+});
+
+test("re-filling resets saturation and detach removes the rail and filter", async ({
+  page,
+}) => {
+  const fillBtn = page.locator('[data-fd-role="fill"]');
+  await enterFill(page);
+
+  await page.locator('[data-fd-role="saturation"]').evaluate((el) => {
+    el.value = "180";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(await page.locator("#v1").evaluate((el) => el.style.filter)).toBe(
+    "saturate(180%)"
+  );
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[data-fd-role="saturation-rail"]')).toHaveCount(0);
+  expect(await page.locator("#v1").evaluate((el) => el.style.filter)).toBe("");
+
+  await page.locator("#v1").hover();
+  await fillBtn.click();
+
+  await expect(page.locator('[data-fd-role="saturation"]')).toHaveValue("100");
+  await expect(page.locator('[data-fd-role="saturation-value"]')).toHaveText("100%");
+  expect(await page.locator("#v1").evaluate((el) => el.style.filter)).toBe(
+    "saturate(100%)"
+  );
 });
 
 test("selecting a preset sets video.playbackRate", async ({ page }) => {

@@ -24,6 +24,22 @@ function embedFrame(page) {
   return page.frameLocator("#embed");
 }
 
+async function stubEmbedMedia(page, duration) {
+  await embedFrame(page).locator("#v1").evaluate((el, duration) => {
+    let currentTime = 0;
+    Object.defineProperty(el, "duration", { get: () => duration, configurable: true });
+    Object.defineProperty(el, "currentTime", {
+      get: () => currentTime,
+      set: (value) => {
+        currentTime = value;
+        el.dispatchEvent(new Event("timeupdate"));
+      },
+      configurable: true,
+    });
+    el.dispatchEvent(new Event("loadedmetadata"));
+  }, duration);
+}
+
 test("a video inside a cross-origin embed iframe gets a hover-revealed Fill button", async ({
   page,
 }) => {
@@ -173,4 +189,28 @@ test("filling the embed iframe attaches the shared control bar (play/pause) to t
   // state and stays hidden.
   await expect(embed.locator('[data-fd-role="fill"]')).toBeHidden();
   await expect(playPauseBtn).toBeHidden();
+});
+
+test("embed iframe shared controls include skip buttons and saturation rail", async ({
+  page,
+}) => {
+  const embed = embedFrame(page);
+  const video = embed.locator("#v1");
+
+  await video.hover();
+  await embed.locator('[data-fd-role="fill"]').click();
+  await stubEmbedMedia(page, 90);
+  await video.dispatchEvent("mousemove");
+
+  await video.evaluate((el) => (el.currentTime = 20));
+  await embed.locator('[data-fd-role="skip-forward"]').click();
+  expect(await video.evaluate((el) => el.currentTime)).toBe(30);
+
+  await embed.locator('[data-fd-role="saturation"]').evaluate((el) => {
+    el.value = "150";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  await expect(embed.locator('[data-fd-role="saturation-value"]')).toHaveText("150%");
+  expect(await video.evaluate((el) => el.style.filter)).toBe("saturate(150%)");
 });
