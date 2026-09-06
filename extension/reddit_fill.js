@@ -207,12 +207,12 @@
         const prevEntry = videoState.get(filledVideo);
         if (prevEntry) {
           FD.detachControls(filledVideo);
-          prevEntry.fillBtn.hidden = false;
+          prevEntry.setFilled(false);
         }
       }
       filledVideo = video;
       FD.attachControls(video, { shadowRoot: shadow, onExit: () => requestExit(video, entry) });
-      entry.fillBtn.hidden = true;
+      entry.setFilled(true);
       sendToTop("enter");
     }
 
@@ -220,7 +220,7 @@
       if (filledVideo !== video) return;
       filledVideo = null;
       FD.detachControls(video);
-      entry.fillBtn.hidden = false;
+      entry.setFilled(false);
       sendToTop("exit");
     }
 
@@ -233,7 +233,7 @@
       if (data.action === "exited" && filledVideo) {
         const entry = videoState.get(filledVideo);
         FD.detachControls(filledVideo);
-        if (entry) entry.fillBtn.hidden = false;
+        if (entry) entry.setFilled(false);
         filledVideo = null;
       }
     });
@@ -253,6 +253,7 @@
       fillBtn.dataset.fdRole = "fill";
       fillBtn.setAttribute("aria-label", "Fill video");
       fillBtn.innerHTML = FD.ICONS.fullscreen;
+      fillBtn.hidden = true;
       shadow.appendChild(fillBtn);
 
       function syncPosition() {
@@ -267,14 +268,57 @@
       window.addEventListener("resize", syncPosition);
       syncPosition();
 
+      // Same hover-reveal pattern as content.js's attachFillButton — this
+      // frame never loads content.js (it's a genuinely separate document),
+      // so the button lifecycle is duplicated rather than shared.
+      let isHoveringVideo = false;
+      let isHoveringButton = false;
+      let isFilled = false;
+
+      function syncVisibility() {
+        fillBtn.hidden = isFilled || !(isHoveringVideo || isHoveringButton);
+      }
+
+      function setFilled(filled) {
+        isFilled = filled;
+        syncVisibility();
+      }
+
+      function handleVideoEnter() {
+        isHoveringVideo = true;
+        syncVisibility();
+      }
+      function handleVideoLeave() {
+        isHoveringVideo = false;
+        syncVisibility();
+      }
+      function handleButtonEnter() {
+        isHoveringButton = true;
+        syncVisibility();
+      }
+      function handleButtonLeave() {
+        isHoveringButton = false;
+        syncVisibility();
+      }
+
+      video.addEventListener("pointerenter", handleVideoEnter);
+      video.addEventListener("pointerleave", handleVideoLeave);
+      fillBtn.addEventListener("pointerenter", handleButtonEnter);
+      fillBtn.addEventListener("pointerleave", handleButtonLeave);
+
       const entry = {
         fillBtn,
         resizeObserver,
+        setFilled,
         cleanup() {
           if (filledVideo === video) requestExit(video, entry);
           resizeObserver.disconnect();
           window.removeEventListener("scroll", syncPosition, true);
           window.removeEventListener("resize", syncPosition);
+          video.removeEventListener("pointerenter", handleVideoEnter);
+          video.removeEventListener("pointerleave", handleVideoLeave);
+          fillBtn.removeEventListener("pointerenter", handleButtonEnter);
+          fillBtn.removeEventListener("pointerleave", handleButtonLeave);
           fillBtn.remove();
           videoState.delete(video);
         },

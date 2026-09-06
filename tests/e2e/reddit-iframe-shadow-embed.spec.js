@@ -32,6 +32,7 @@ test("a video inside a shadow-nested embed iframe gets a Fill button", async ({ 
 test("Fill actually fills a shadow-nested embed iframe to the viewport", async ({ page }) => {
   const iframeEl = page.locator("#embed");
 
+  await embedFrame(page).locator("#v1").hover();
   await embedFrame(page).locator('[data-fd-role="fill"]').click();
 
   await expect(iframeEl).toHaveClass(/fd-reddit-frame-fill/);
@@ -49,6 +50,7 @@ test("filling a shadow-nested embed iframe neutralizes a light-DOM ancestor abov
   const overflowBefore = await wrapper.evaluate((el) => el.style.overflow);
   expect(overflowBefore).toBe("hidden");
 
+  await embedFrame(page).locator("#v1").hover();
   await embedFrame(page).locator('[data-fd-role="fill"]').click();
   const overflowDuring = await wrapper.evaluate((el) => el.style.overflow);
   expect(overflowDuring).toBe("visible");

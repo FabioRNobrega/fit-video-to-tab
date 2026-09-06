@@ -8,10 +8,32 @@ test.beforeEach(async ({ page }) => {
   await page.goto(FIXTURE);
 });
 
-test("Fill button appears as an icon over the video's corner", async ({ page }) => {
+test("Fill button is hidden until the video is hovered, then appears as an icon over its corner", async ({
+  page,
+}) => {
+  const video = page.locator("#v1");
   const fillBtn = page.locator('[data-fd-role="fill"]');
+
+  await expect(fillBtn).toBeHidden();
+
+  await video.hover();
+
+  await expect(fillBtn).toBeVisible();
   await expect(fillBtn).toHaveAttribute("aria-label", "Fill video");
   await expect(fillBtn.locator("svg")).toBeVisible();
+});
+
+test("moving the pointer off the video hides the Fill button again", async ({ page }) => {
+  const video = page.locator("#v1");
+  const fillBtn = page.locator('[data-fd-role="fill"]');
+
+  await video.hover();
+  await expect(fillBtn).toBeVisible();
+
+  // Move somewhere clearly outside the video and the button's overlay.
+  await page.mouse.move(0, 0);
+
+  await expect(fillBtn).toBeHidden();
 });
 
 test("clicking Fill fills the viewport, hides native controls, and hides the floating fill icon", async ({
@@ -20,6 +42,7 @@ test("clicking Fill fills the viewport, hides native controls, and hides the flo
   const video = page.locator("#v1");
   const fillBtn = page.locator('[data-fd-role="fill"]');
 
+  await video.hover();
   await fillBtn.click();
 
   // The bottom bar has its own Exit control once filled, so the floating
@@ -35,22 +58,28 @@ test("clicking Fill fills the viewport, hides native controls, and hides the flo
   expect(box.height).toBeCloseTo(viewport.height, 0);
 });
 
-test("Escape exits fill mode, restores controls, and reveals the floating fill icon again", async ({
+test("Escape exits fill mode, restores controls, and the floating fill icon follows hover state", async ({
   page,
 }) => {
   const video = page.locator("#v1");
   const fillBtn = page.locator('[data-fd-role="fill"]');
 
+  await video.hover();
   await fillBtn.click();
   await expect(video).toHaveClass(/fd-fill-active/);
   await expect(fillBtn).toBeHidden();
 
   await page.keyboard.press("Escape");
 
+  // The pointer is still over the (now-unfilled) video, so the button
+  // should reappear.
   await expect(fillBtn).toBeVisible();
   await expect(fillBtn).toHaveAttribute("aria-label", "Fill video");
   await expect(video).not.toHaveClass(/fd-fill-active/);
   await expect(video).toHaveAttribute("controls", "");
+
+  await page.mouse.move(0, 0);
+  await expect(fillBtn).toBeHidden();
 });
 
 test("clicking the bar's Exit button also exits fill mode", async ({ page }) => {
@@ -58,6 +87,7 @@ test("clicking the bar's Exit button also exits fill mode", async ({ page }) => 
   const fillBtn = page.locator('[data-fd-role="fill"]');
   const exitBtn = page.locator('[data-fd-role="exit"]');
 
+  await video.hover();
   await fillBtn.click();
   // The bar is hidden (pointer-events: none) until the pointer moves over
   // it, per FR9 — reveal it first or the click hit-tests through to the
@@ -65,7 +95,10 @@ test("clicking the bar's Exit button also exits fill mode", async ({ page }) => 
   await video.dispatchEvent("mousemove");
   await exitBtn.click();
 
-  await expect(fillBtn).toBeVisible();
+  // The pointer ended up over the (now-detached) Exit control, off both
+  // the video and the fill icon, so the fill icon follows that hover
+  // state and stays hidden.
+  await expect(fillBtn).toBeHidden();
   await expect(fillBtn).toHaveAttribute("aria-label", "Fill video");
   await expect(video).not.toHaveClass(/fd-fill-active/);
 });
@@ -79,6 +112,7 @@ test("control bar (Play/Pause, Mute) is absent until filled, then present", asyn
   await expect(playPauseBtn).toBeHidden();
   await expect(muteBtn).toBeHidden();
 
+  await video.hover();
   await fillBtn.click();
 
   await expect(playPauseBtn).toBeVisible();
@@ -94,6 +128,7 @@ test("video is muted by default on entering fill mode", async ({ page }) => {
   const video = page.locator("#v1");
   const fillBtn = page.locator('[data-fd-role="fill"]');
 
+  await video.hover();
   await fillBtn.click();
   expect(await video.evaluate((el) => el.muted)).toBe(true);
 });
@@ -103,6 +138,7 @@ test("Mute button toggles video.muted and updates its label", async ({ page }) =
   const fillBtn = page.locator('[data-fd-role="fill"]');
   const muteBtn = page.locator('[data-fd-role="mute"]');
 
+  await video.hover();
   await fillBtn.click();
   expect(await video.evaluate((el) => el.muted)).toBe(true); // muted by default
 
@@ -144,6 +180,7 @@ test("Play/Pause button calls video.play()/pause() and its icon follows real pla
     };
   });
 
+  await page.locator("#v1").hover();
   await fillBtn.click();
   await expect(playPauseBtn).toHaveAttribute("aria-label", "Play");
 

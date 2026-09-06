@@ -20,6 +20,7 @@ test("filling the embed iframe evicts an active generic-path fill", async ({ pag
   const nativeFillBtn = page.locator('[data-fd-role="fill"]');
   const embedFrame = page.frameLocator("#embed");
 
+  await nativeVideo.hover();
   await nativeFillBtn.click();
   await expect(nativeVideo).toHaveClass(/fd-fill-active/);
 
@@ -44,9 +45,15 @@ test("filling the generic-path video evicts an active embed-iframe fill", async 
   const nativeFillBtn = page.locator('[data-fd-role="fill"]');
   const embedFrame = page.frameLocator("#embed");
 
+  await embedFrame.locator("#v1").hover();
   await embedFrame.locator('[data-fd-role="fill"]').click();
   await expect(iframeEl).toHaveClass(/fd-reddit-frame-fill/);
 
+  // The now-filled iframe covers the whole top-frame viewport (fixed,
+  // top z-index), occluding the native video itself for real pointer
+  // input — dispatch the hover event directly, the same kind of
+  // occlusion workaround as the evaluate()-click above.
+  await nativeVideo.dispatchEvent("pointerenter");
   await nativeFillBtn.click();
 
   await expect(nativeVideo).toHaveClass(/fd-fill-active/);

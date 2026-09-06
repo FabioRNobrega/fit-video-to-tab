@@ -18,6 +18,7 @@ const path = require("path");
 const FIXTURE = "file://" + path.join(__dirname, "..", "fixtures", "drag.html");
 
 async function enterFillAndGetRect(page) {
+  await page.locator("#v1").hover();
   await page.locator('[data-fd-role="fill"]').click();
   return page.locator("#v1").evaluate((el) => {
     const r = el.getBoundingClientRect();

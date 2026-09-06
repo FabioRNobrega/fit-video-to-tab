@@ -69,7 +69,10 @@
     // fillControls.js's bottom bar has its own Exit control, so the
     // floating icon button is redundant (and, positioned over the video's
     // corner, visually in the way) once filled — hide it for the duration.
-    controls.fillBtn.hidden = true;
+    // content.js owns hover-reveal visibility, so report fill state through
+    // setFilled rather than writing fillBtn.hidden directly.
+    if (controls.setFilled) controls.setFilled(true);
+    else controls.fillBtn.hidden = true;
 
     escapeHandler = (e) => {
       if (e.key === "Escape") exitFill();
@@ -121,7 +124,11 @@
     prevHtmlOverflow = null;
     prevBodyOverflow = null;
 
-    controls.fillBtn.hidden = false;
+    // Restore the floating button to hover-dependent visibility rather
+    // than forcing it visible — content.js's setFilled reflects whether
+    // the pointer is still over the video/button.
+    if (controls.setFilled) controls.setFilled(false);
+    else controls.fillBtn.hidden = false;
     activeVideo = null;
     activeControls = null;
   }

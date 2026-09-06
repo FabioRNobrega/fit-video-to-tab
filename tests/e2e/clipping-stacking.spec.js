@@ -20,6 +20,7 @@ test.beforeEach(async ({ page }) => {
 
 test("filling a clipped video reaches the true viewport", async ({ page }) => {
   const video = page.locator("#v1");
+  await page.locator("#v1").hover();
   await page.locator('[data-fd-role="fill"]').first().click();
 
   await expect(video).toHaveClass(/fd-fill-active/);
@@ -30,6 +31,7 @@ test("filling a clipped video reaches the true viewport", async ({ page }) => {
 });
 
 test("filled video paints above the page's own fixed sidebar", async ({ page }) => {
+  await page.locator("#v1").hover();
   await page.locator('[data-fd-role="fill"]').first().click();
 
   // The sidebar covers x:0-60, y:0-100%. y:100 stays clear of the
@@ -53,6 +55,7 @@ test("filling one video does not affect a sibling video sharing the timeline", a
   const timelineOverflowBefore = await timeline.evaluate((el) => el.style.overflow);
   expect(timelineOverflowBefore).toBe("");
 
+  await page.locator("#v1").hover();
   await page.locator('[data-fd-role="fill"]').first().click();
 
   await expect(v1).toHaveClass(/fd-fill-active/);
@@ -75,6 +78,7 @@ test("stacking overrides on an ancestor above the shared boundary are restored o
   const zIndexBefore = await app.evaluate((el) => el.style.zIndex);
   expect(zIndexBefore).toBe("");
 
+  await page.locator("#v1").hover();
   await page.locator('[data-fd-role="fill"]').first().click();
   const zIndexDuring = await app.evaluate((el) => el.style.zIndex);
   expect(zIndexDuring).toBe("auto");

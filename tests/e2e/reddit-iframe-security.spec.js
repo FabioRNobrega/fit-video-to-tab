@@ -26,6 +26,7 @@ test("a Fill request from an unlisted origin is ignored", async ({ page }) => {
     "aria-label",
     "Fill video"
   );
+  await embedFrame.locator("#v1").hover();
   await embedFrame.locator('[data-fd-role="fill"]').click();
 
   // The iframe optimistically hides its own fill icon and attaches the

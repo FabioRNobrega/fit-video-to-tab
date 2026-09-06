@@ -60,6 +60,7 @@
     fillBtn.dataset.fdRole = "fill";
     fillBtn.setAttribute("aria-label", "Fill video");
     fillBtn.innerHTML = FD.ICONS.fullscreen;
+    fillBtn.hidden = true;
     shadow.appendChild(fillBtn);
 
     function syncPosition() {
@@ -77,7 +78,49 @@
     window.addEventListener("resize", syncPosition);
     syncPosition();
 
-    const controls = { fillBtn, shadowRoot: shadow };
+    // Hover-reveal: hidden until the pointer is over the video or the
+    // button itself (the button lives in a separate shadow overlay, so
+    // moving from the video onto it must not hide it mid-click), and
+    // forced hidden while filled regardless of hover — fillTab.js reports
+    // fill state through setFilled rather than touching fillBtn.hidden
+    // directly, keeping fill-state ownership in fillTab.js and hover-
+    // visibility ownership here.
+    let isHoveringVideo = false;
+    let isHoveringButton = false;
+    let isFilled = false;
+
+    function syncVisibility() {
+      fillBtn.hidden = isFilled || !(isHoveringVideo || isHoveringButton);
+    }
+
+    function setFilled(filled) {
+      isFilled = filled;
+      syncVisibility();
+    }
+
+    function handleVideoEnter() {
+      isHoveringVideo = true;
+      syncVisibility();
+    }
+    function handleVideoLeave() {
+      isHoveringVideo = false;
+      syncVisibility();
+    }
+    function handleButtonEnter() {
+      isHoveringButton = true;
+      syncVisibility();
+    }
+    function handleButtonLeave() {
+      isHoveringButton = false;
+      syncVisibility();
+    }
+
+    video.addEventListener("pointerenter", handleVideoEnter);
+    video.addEventListener("pointerleave", handleVideoLeave);
+    fillBtn.addEventListener("pointerenter", handleButtonEnter);
+    fillBtn.addEventListener("pointerleave", handleButtonLeave);
+
+    const controls = { fillBtn, shadowRoot: shadow, setFilled };
     controls.onExit = () => FD.toggleFill(video, controls);
     fillBtn.addEventListener("click", () => FD.toggleFill(video, controls));
 
@@ -88,6 +131,10 @@
         resizeObserver.disconnect();
         window.removeEventListener("scroll", syncPosition, true);
         window.removeEventListener("resize", syncPosition);
+        video.removeEventListener("pointerenter", handleVideoEnter);
+        video.removeEventListener("pointerleave", handleVideoLeave);
+        fillBtn.removeEventListener("pointerenter", handleButtonEnter);
+        fillBtn.removeEventListener("pointerleave", handleButtonLeave);
         fillBtn.remove();
         videoState.delete(video);
       },

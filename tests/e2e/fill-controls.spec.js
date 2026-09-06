@@ -32,6 +32,7 @@ async function stubMedia(page, duration) {
 }
 
 async function enterFill(page) {
+  await page.locator("#v1").hover();
   await page.locator('[data-fd-role="fill"]').click();
 }
 
@@ -183,6 +184,7 @@ test("markers and loop mode reset when fill mode is exited and re-entered", asyn
   await page.locator('[data-fd-role="repeat"]').click();
 
   await page.keyboard.press("Escape"); // exit — fillBtn is hidden while filled
+  await video.hover();
   await fillBtn.click(); // re-enter same video
   await stubMedia(page, 60);
 
@@ -288,6 +290,7 @@ test("re-filling the same video resets playback speed to 1x", async ({ page }) =
   await page.locator('[data-fd-role="speed"]').selectOption("2");
 
   await page.keyboard.press("Escape"); // exit — fillBtn is hidden while filled
+  await page.locator("#v1").hover();
   await fillBtn.click(); // re-enter same video
 
   await expect(page.locator('[data-fd-role="speed"]')).toHaveValue("1");
