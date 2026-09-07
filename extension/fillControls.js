@@ -506,6 +506,7 @@
         controlHandlers.onSaturationInput();
       },
       onExitClick: () => {
+        if (FD.onFillControlExit) FD.onFillControlExit(activeVideo);
         if (controls.onExit) controls.onExit();
       },
     };

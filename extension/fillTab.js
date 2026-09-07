@@ -112,6 +112,7 @@
     // setFilled rather than writing fillBtn.hidden directly.
     if (controls.setFilled) controls.setFilled(true);
     else controls.fillBtn.hidden = true;
+    if (FD.onFillEnter) FD.onFillEnter(video);
 
     escapeHandler = (e) => {
       if (e.key === "Escape") exitFill();
@@ -178,6 +179,7 @@
     // the pointer is still over the video/button.
     if (controls.setFilled) controls.setFilled(false);
     else controls.fillBtn.hidden = false;
+    if (FD.onFillExit) FD.onFillExit(video);
     activeVideo = null;
     activeControls = null;
   }

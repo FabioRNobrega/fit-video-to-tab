@@ -166,11 +166,15 @@
 
     const controls = { fillBtn, shadowRoot: shadow, setFilled };
     controls.onExit = () => FD.toggleFill(video, controls);
-    fillBtn.addEventListener("click", () => FD.toggleFill(video, controls));
+    fillBtn.addEventListener("click", () => {
+      if (FD.beforeFillToggle && FD.beforeFillToggle(video, controls)) return;
+      FD.toggleFill(video, controls);
+    });
 
     videoState.set(video, {
       fillBtn,
       resizeObserver,
+      setFilled,
       cleanup() {
         resizeObserver.disconnect();
         window.removeEventListener("scroll", syncPosition, true);
@@ -238,4 +242,17 @@
   }
 
   observeRoot(document.body);
+
+  FD.fillVideo = function (video) {
+    const entry = videoState.get(video);
+    if (!entry) return false;
+    const controls = {
+      fillBtn: entry.fillBtn,
+      shadowRoot: shadow,
+      setFilled: entry.setFilled,
+    };
+    controls.onExit = () => FD.toggleFill(video, controls);
+    FD.toggleFill(video, controls);
+    return true;
+  };
 })();

@@ -21,7 +21,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["ancestorOverrides.js", "fillTab.js", "drag.js", "fillControls.js", "content.js"],
+      "js": ["ancestorOverrides.js", "fillTab.js", "drag.js", "fillControls.js", "instagramFill.js", "content.js"],
       "run_at": "document_idle"
     },
     {
