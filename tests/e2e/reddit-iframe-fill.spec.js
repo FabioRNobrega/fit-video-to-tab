@@ -213,4 +213,9 @@ test("embed iframe shared controls include skip buttons and saturation rail", as
 
   await expect(embed.locator('[data-fd-role="saturation-value"]')).toHaveText("150%");
   expect(await video.evaluate((el) => el.style.filter)).toBe("saturate(150%)");
+
+  await embed.locator('[data-fd-role="saturation-reset"]').click();
+  await expect(embed.locator('[data-fd-role="saturation"]')).toHaveValue("100");
+  await expect(embed.locator('[data-fd-role="saturation-value"]')).toHaveText("100%");
+  expect(await video.evaluate((el) => el.style.filter)).toBe("saturate(100%)");
 });

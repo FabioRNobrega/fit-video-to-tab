@@ -134,6 +134,7 @@ test("shared controls and saturation effect are active on the RedGIF video", asy
     "saturation-rail",
     "saturation",
     "saturation-value",
+    "saturation-reset",
     "exit",
   ];
 

@@ -34,6 +34,8 @@
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/></svg>',
     repeat:
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path d="M11 4v1.466a.25.25 0 0 0 .41.192l2.36-1.966a.25.25 0 0 0 0-.384l-2.36-1.966a.25.25 0 0 0-.41.192V3H5a5 5 0 0 0-4.48 7.223.5.5 0 0 0 .896-.446A4 4 0 0 1 5 4zm4.48 1.777a.5.5 0 0 0-.896.446A4 4 0 0 1 11 12H5.001v-1.466a.25.25 0 0 0-.41-.192l-2.36 1.966a.25.25 0 0 0 0 .384l2.36 1.966a.25.25 0 0 0 .41-.192V13h6a5 5 0 0 0 4.48-7.223Z"/><path d="M9 5.5a.5.5 0 0 0-.854-.354l-1.75 1.75a.5.5 0 1 0 .708.708L8 6.707V10.5a.5.5 0 0 0 1 0z"/></svg>',
+    reset:
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/></svg>',
   };
 
   let styleInjected = false;
@@ -164,9 +166,9 @@
       "  align-items: center;",
       "  gap: 8px;",
       "  width: 38px;",
-      "  height: 180px;",
+      "  min-height: 208px;",
       "  padding: 10px 6px;",
-      "  background: rgba(0, 0, 0, 0.72);",
+      "  background: rgba(0, 0, 0, 0.75);",
       "  border: 1px solid rgba(255, 255, 255, 0.18);",
       "  border-radius: 6px;",
       "  color: #fff;",
@@ -183,13 +185,16 @@
       "}",
       ".fd-saturation-range {",
       "  width: 140px;",
-      "  margin: 58px 0;",
+      "  margin: 56px 0;",
       "  accent-color: #fff;",
       "  transform: rotate(-90deg);",
       "}",
       ".fd-saturation-value {",
       "  line-height: 1;",
       "  white-space: nowrap;",
+      "}",
+      ".fd-saturation-reset {",
+      "  flex: 0 0 auto;",
       "}",
     ].join("\n");
     shadow.appendChild(style);
@@ -368,6 +373,7 @@
     el.className = "fd-saturation-rail";
     el.setAttribute("data-fd-role", "saturation-rail");
     el.innerHTML = [
+      '<button type="button" class="fd-ctrl-btn fd-saturation-reset" data-fd-role="saturation-reset" aria-label="Reset saturation" title="Reset saturation"></button>',
       '<input type="range" class="fd-saturation-range" data-fd-role="saturation" min="0" max="300" step="1" value="100" aria-label="Saturation" />',
       '<span class="fd-saturation-value" data-fd-role="saturation-value">100%</span>',
     ].join("");
@@ -410,6 +416,7 @@
       abLoop: bar.querySelector('[data-fd-role="ab-loop"]'),
       clearLoop: bar.querySelector('[data-fd-role="clear-loop"]'),
       exit: bar.querySelector('[data-fd-role="exit"]'),
+      saturationReset: rail.querySelector('[data-fd-role="saturation-reset"]'),
       saturation: rail.querySelector('[data-fd-role="saturation"]'),
       saturationValue: rail.querySelector('[data-fd-role="saturation-value"]'),
     };
@@ -422,6 +429,7 @@
     elements.abLoop.innerHTML = FD.ICONS.abLoop;
     elements.clearLoop.innerHTML = FD.ICONS.clear;
     elements.exit.innerHTML = FD.ICONS.fullscreenExit;
+    elements.saturationReset.innerHTML = FD.ICONS.reset;
     updatePlayPauseIcon();
     updateMuteIcon();
     updateSpeedSelect();
@@ -493,6 +501,10 @@
         video.style.filter = "saturate(" + value + "%)";
         elements.saturationValue.textContent = value + "%";
       },
+      onSaturationResetClick: () => {
+        elements.saturation.value = "100";
+        controlHandlers.onSaturationInput();
+      },
       onExitClick: () => {
         if (controls.onExit) controls.onExit();
       },
@@ -513,6 +525,10 @@
     elements.abLoop.addEventListener("click", toggleAbLoop);
     elements.clearLoop.addEventListener("click", clearLoopPoints);
     elements.saturation.addEventListener("input", controlHandlers.onSaturationInput);
+    elements.saturationReset.addEventListener(
+      "click",
+      controlHandlers.onSaturationResetClick
+    );
     // The exit action is caller-supplied (controls.onExit) rather than
     // hardcoded to FD.toggleFill, since fillControls.js is also reused by
     // redditFill.js's embed-iframe frame, where FD.toggleFill (fillTab.js)
@@ -559,6 +575,10 @@
     elements.abLoop.removeEventListener("click", toggleAbLoop);
     elements.clearLoop.removeEventListener("click", clearLoopPoints);
     elements.saturation.removeEventListener("input", controlHandlers.onSaturationInput);
+    elements.saturationReset.removeEventListener(
+      "click",
+      controlHandlers.onSaturationResetClick
+    );
     elements.exit.removeEventListener("click", controlHandlers.onExitClick);
 
     video.loop = false;

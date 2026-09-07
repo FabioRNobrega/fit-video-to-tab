@@ -329,10 +329,12 @@ test("saturation rail starts at 100 percent and updates the video filter live", 
   await enterFill(page);
 
   const saturation = page.locator('[data-fd-role="saturation"]');
+  const reset = page.locator('[data-fd-role="saturation-reset"]');
   const value = page.locator('[data-fd-role="saturation-value"]');
   const video = page.locator("#v1");
 
   await expect(page.locator('[data-fd-role="saturation-rail"]')).toHaveCount(1);
+  await expect(reset).toHaveAttribute("aria-label", "Reset saturation");
   await expect(saturation).toHaveAttribute("type", "range");
   await expect(saturation).toHaveAttribute("min", "0");
   await expect(saturation).toHaveAttribute("max", "300");
@@ -347,6 +349,13 @@ test("saturation rail starts at 100 percent and updates the video filter live", 
 
   await expect(value).toHaveText("150%");
   expect(await video.evaluate((el) => el.style.filter)).toBe("saturate(150%)");
+
+  await video.dispatchEvent("mousemove");
+  await reset.click();
+
+  await expect(saturation).toHaveValue("100");
+  await expect(value).toHaveText("100%");
+  expect(await video.evaluate((el) => el.style.filter)).toBe("saturate(100%)");
 });
 
 test("re-filling resets saturation and detach removes the rail and filter", async ({

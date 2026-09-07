@@ -32,7 +32,7 @@
       "  width: 100vw !important;",
       "  height: 100vh !important;",
       "  object-fit: cover !important;",
-      "  z-index: 2147483647 !important;",
+      "  z-index: 2147483646 !important;",
       "  background: #000;",
       "}",
     ].join("\n");
@@ -57,7 +57,7 @@
     video.style.setProperty("width", "100vw", "important");
     video.style.setProperty("height", "100vh", "important");
     video.style.setProperty("object-fit", "cover", "important");
-    video.style.setProperty("z-index", "2147483647", "important");
+    video.style.setProperty("z-index", "2147483646", "important");
     video.style.setProperty("background", "#000", "important");
   }
 

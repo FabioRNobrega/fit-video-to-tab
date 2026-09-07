@@ -158,7 +158,7 @@
 
     const overlayHost = document.createElement("div");
     overlayHost.style.cssText =
-      "position: fixed; top: 0; left: 0; pointer-events: none; z-index: 2147483647;";
+      "position: fixed; inset: 0; pointer-events: none; z-index: 2147483647;";
     document.body.appendChild(overlayHost);
     const shadow = overlayHost.attachShadow({ mode: "open" });
 
